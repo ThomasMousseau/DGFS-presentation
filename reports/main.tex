@@ -5,13 +5,17 @@
 \documentclass[aspectratio=169,xcolor=dvipsnames]{beamer}
 \setbeameroption{show notes} %TODO: Thomas a enlever avant la presentation
 \usetheme{SimplePlus}
-\useoutertheme{miniframes}  % Adds navigation dots at the top for subsections
-\usecolortheme{default}  % Adds a green color scheme; adjust for darker green if needed
 
+\useoutertheme{miniframes}  % Adds navigation dots at the top for subsections
+\usecolortheme{default}  % default or spruce for greenish
 \definecolor{darkgreen}{RGB}{0,50,0}  % Adjust RGB values for desired shade (e.g., darker: 0,30,0)
 
 \setbeamercolor{structure}{fg=darkgreen}  % For titles, frames, etc.
 \setbeamercolor{normal text}{fg=darkgreen}  % For body text
+
+% Custom block colors
+\setbeamercolor{block title}{bg=darkgreen,fg=white}  % Dark green background for block titles
+\setbeamercolor{block body}{bg=lightgray,fg=darkgreen}  % Light background for block body
 
 \usepackage{comment}
 \usepackage{hyperref}
@@ -24,7 +28,7 @@
 %----------------------------------------------------------------------------------------
 
 \title{Generating a Terrain-Robustness Benchmark for Legged Locomotion:
-A Prototype via Terrain Authoring and Active Learning}
+A Prototype via Terrain Authoring and Active Learning (ICRA 2023)}
 \subtitle{Chong Zhang and Lizhi Yang}
 
 \author{Thomas Mousseau} 
@@ -59,28 +63,46 @@ A Prototype via Terrain Authoring and Active Learning}
 \subsection{Legged Locomotion Challenges}
 % Add content: Introduce robotics context, terrain variability, and real-world examples.
 
-\subsection{Benchmark Limitations}
+\begin{frame}{Legged Locomotion Challenges}
+    \begin{block}{Emerging Topic in Legged Robotics}
+        Terrain-aware locomotion has become an emerging topic in legged robotics. However, it is hard to generate diverse, challenging, and realistic unstructured terrains in simulation, which limits the way researchers evaluate their locomotion policies.
+    \end{block}
+
+\end{frame}
+
+\subsection{GFlowNet's Role in Addressing Terrain Benchmarking Challenges}
 % Add content: Discuss current benchmarks' shortcomings and the need for generative methods.
 
+\begin{frame}{GFlowNet's Role in Addressing Terrain Benchmarking Challenges}
+    \begin{block}{Key Challenges for Terrain Benchmarking}
+        To achieve reliable quantification of robustness, terrain samples should resemble real terrains in the wild. The generation process should be controllable to produce high-quality terrains that are challenging to a user-specified extent. Finally, the sampler must maintain terrain quality and diversity simultaneously.
+    \end{block}
+    \begin{itemize}
+        \item GFlowNet ensures high-quality terrains and diversity among those included in the final benchmark by providing probabilistic sampling from unnormalized distributions.
+        \item It addresses realism through flow-based modeling of complex terrains.
+        \item Controllability via reward-guided active learning for user-specified challenges.
+        \item Quality-diversity balance through efficient exploration of terrain spaces.
+    \end{itemize}
+\end{frame}
 %------------------------------------------------
 \section{Methodology and Architecture}
 
-\subsection{Terrain Authoring}
+\subsection{Conditional GAN for Terrain Generation}
 % Add content: Explain procedural terrain generation and parameters.
 
-\subsection{Active Learning with GFlowNet}
+\subsection{GFlowNet and Active Learning}
 % Add content: Detail GFlowNet's role in sampling, flow matching, and the active learning loop.
 
 %------------------------------------------------
 
 %------------------------------------------------
 
-\section{Experiments and Results}
+\section{Evaluations and Results}
 
-\subsection{Experimental Setup}
+\subsection{Diversity and Quality of Generated Terrains}
 % Add content: Describe simulation environments, metrics, and robot models.
 
-\subsection{Results and Analysis}
+\subsection{Sample Efficiency and Benchmarking Performance}
 % Add content: Present benchmarks, performance comparisons, and ablation studies.
 
 %------------------------------------------------
@@ -91,7 +113,7 @@ A Prototype via Terrain Authoring and Active Learning}
 \subsection{Key Insights}
 % Add content: Summarize GFlowNet's impact and paper's contributions.
 
-\subsection{Future Directions}
+\subsection{Future Directions and Usage since its release}
 % Add content: Discuss limitations, extensions, and personal thoughts.
 
 \begin{frame}{Conclusion}
