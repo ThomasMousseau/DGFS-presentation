@@ -7,3 +7,9 @@ reports/*.gz
 reports/*.nav
 reports/*.aux
 reports/*.log
+reports/*.out
+reports/*.toc
+reports/*.fls
+reports/*.fdb_latexmk
+reports/*.synctex.gz
+reports/*.snm

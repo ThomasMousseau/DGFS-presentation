@@ -1,0 +1,84 @@
+%----------------------------------------------------------------------------------------
+%    PACKAGES AND THEMES
+%----------------------------------------------------------------------------------------
+
+\documentclass[aspectratio=169,xcolor=dvipsnames]{beamer}
+\setbeameroption{show notes} %TODO: Thomas a enlever avant la presentation
+\usetheme{SimplePlus}
+
+\usepackage{comment}
+\usepackage{hyperref}
+\usepackage{graphicx} % Allows including images
+\usepackage{booktabs} % Allows the use of \toprule, \midrule and \bottomrule in tables
+\usepackage{array} % Allows >{\centering\arraybackslash} in tabular
+
+%----------------------------------------------------------------------------------------
+%    TITLE PAGE
+%----------------------------------------------------------------------------------------
+
+\title{Stochastic Optimal Control Matching}
+\subtitle{Carles Domingo-Enrich, Jiequn Han, Brandon Amos, Joan Bruna, Ricky T. Q. Chen}
+
+\author{Thomas } % Your name for the title page
+
+% \institute
+% {
+%     Department of Computer Science and Information Engineering \\
+%     National Taiwan University % Your institution for the title page
+% }
+\date{\today} % Date, can be changed to a custom date
+
+%----------------------------------------------------------------------------------------
+%    PRESENTATION SLIDES
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+\begin{frame}
+    % Print the title page as the first slide
+    \titlepage
+\end{frame}
+
+\begin{frame}{Overview}
+    % Throughout your presentation, if you choose to use \section{} and \subsection{} commands, these will automatically be printed on this slide as an overview of your presentation
+    \tableofcontents
+\end{frame}
+
+%------------------------------------------------
+\section{Setup and Preliminaries}
+
+
+
+%------------------------------------------------
+\section{Stochastic Optimal Control Matching}
+
+%------------------------------------------------
+
+%------------------------------------------------
+
+\section{Experiments and results}
+
+
+%------------------------------------------------
+
+%------------------------------------------------
+\section{Conclusion}
+
+\begin{frame}{Conclusion}
+
+    \begin{block}{Personal thoughts and conclusion}
+
+    SOCM is a framework grounded in theory that has shown interesting empirical results in specific benchmarks, but to truly judge its potential further application of this framework needs to be explored. 
+    \\
+    \vspace{0.2cm}
+    This said the authors seems to have already identified a few difficulties with this approach being the high variance related to the factor alpha(v, Xv, B) due to a mismatch between the probability measures induced by the learned control and the optimal control. This is a problem that is also encountered in out-of-distribution generalization for reinforcement learning.
+    \\
+    \vspace{0.2cm}
+    Additionally, I would love to come back to this paper in the next year after having acquired a proper foundation in stochastic calculus, partial differential equations, and statistical mechanics.
+
+    \end{block}
+
+\end{frame}
+
+
+\end{document}
