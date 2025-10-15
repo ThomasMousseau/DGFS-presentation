@@ -1,0 +1,9 @@
+.gz
+.nav
+.aux
+.log
+
+reports/*.gz
+reports/*.nav
+reports/*.aux
+reports/*.log
