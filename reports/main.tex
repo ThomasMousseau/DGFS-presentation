@@ -5,6 +5,13 @@
 \documentclass[aspectratio=169,xcolor=dvipsnames]{beamer}
 \setbeameroption{show notes} %TODO: Thomas a enlever avant la presentation
 \usetheme{SimplePlus}
+\useoutertheme{miniframes}  % Adds navigation dots at the top for subsections
+\usecolortheme{default}  % Adds a green color scheme; adjust for darker green if needed
+
+\definecolor{darkgreen}{RGB}{0,50,0}  % Adjust RGB values for desired shade (e.g., darker: 0,30,0)
+
+\setbeamercolor{structure}{fg=darkgreen}  % For titles, frames, etc.
+\setbeamercolor{normal text}{fg=darkgreen}  % For body text
 
 \usepackage{comment}
 \usepackage{hyperref}
@@ -16,10 +23,11 @@
 %    TITLE PAGE
 %----------------------------------------------------------------------------------------
 
-\title{Stochastic Optimal Control Matching}
-\subtitle{Carles Domingo-Enrich, Jiequn Han, Brandon Amos, Joan Bruna, Ricky T. Q. Chen}
+\title{Generating a Terrain-Robustness Benchmark for Legged Locomotion:
+A Prototype via Terrain Authoring and Active Learning}
+\subtitle{Chong Zhang and Lizhi Yang}
 
-\author{Thomas } % Your name for the title page
+\author{Thomas Mousseau} 
 
 % \institute
 % {
@@ -36,6 +44,7 @@
 
 \begin{frame}
     % Print the title page as the first slide
+    \vspace*{-2cm}
     \titlepage
 \end{frame}
 
@@ -45,38 +54,47 @@
 \end{frame}
 
 %------------------------------------------------
-\section{Setup and Preliminaries}
+\section{Problem Setup}
 
+\subsection{Legged Locomotion Challenges}
+% Add content: Introduce robotics context, terrain variability, and real-world examples.
 
+\subsection{Benchmark Limitations}
+% Add content: Discuss current benchmarks' shortcomings and the need for generative methods.
 
 %------------------------------------------------
-\section{Stochastic Optimal Control Matching}
+\section{Methodology and Architecture}
+
+\subsection{Terrain Authoring}
+% Add content: Explain procedural terrain generation and parameters.
+
+\subsection{Active Learning with GFlowNet}
+% Add content: Detail GFlowNet's role in sampling, flow matching, and the active learning loop.
 
 %------------------------------------------------
 
 %------------------------------------------------
 
-\section{Experiments and results}
+\section{Experiments and Results}
 
+\subsection{Experimental Setup}
+% Add content: Describe simulation environments, metrics, and robot models.
+
+\subsection{Results and Analysis}
+% Add content: Present benchmarks, performance comparisons, and ablation studies.
 
 %------------------------------------------------
 
 %------------------------------------------------
 \section{Conclusion}
 
+\subsection{Key Insights}
+% Add content: Summarize GFlowNet's impact and paper's contributions.
+
+\subsection{Future Directions}
+% Add content: Discuss limitations, extensions, and personal thoughts.
+
 \begin{frame}{Conclusion}
-
-    \begin{block}{Personal thoughts and conclusion}
-
-    SOCM is a framework grounded in theory that has shown interesting empirical results in specific benchmarks, but to truly judge its potential further application of this framework needs to be explored. 
-    \\
-    \vspace{0.2cm}
-    This said the authors seems to have already identified a few difficulties with this approach being the high variance related to the factor alpha(v, Xv, B) due to a mismatch between the probability measures induced by the learned control and the optimal control. This is a problem that is also encountered in out-of-distribution generalization for reinforcement learning.
-    \\
-    \vspace{0.2cm}
-    Additionally, I would love to come back to this paper in the next year after having acquired a proper foundation in stochastic calculus, partial differential equations, and statistical mechanics.
-
-    \end{block}
 
 \end{frame}
 
