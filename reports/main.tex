@@ -7,15 +7,12 @@
 \usetheme{SimplePlus}
 
 \useoutertheme{miniframes}  % Adds navigation dots at the top for subsections
-\usecolortheme{default}  % default or spruce for greenish
-\definecolor{darkgreen}{RGB}{0,50,0}  % Adjust RGB values for desired shade (e.g., darker: 0,30,0)
 
-\setbeamercolor{structure}{fg=darkgreen}  % For titles, frames, etc.
-\setbeamercolor{normal text}{fg=darkgreen}  % For body text
+\usecolortheme{} 
 
-% Custom block colors
-\setbeamercolor{block title}{bg=darkgreen,fg=white}  % Dark green background for block titles
-\setbeamercolor{block body}{bg=lightgray,fg=darkgreen}  % Light background for block body
+\setbeamercolor{block title}{bg=structure,fg=white}  % Navy blue background for block titles
+\setbeamercolor{block body}{bg=structure!10,fg=structure}  % Light navy tint for block body
+
 
 \usepackage{comment}
 \usepackage{hyperref}
@@ -27,10 +24,9 @@
 %    TITLE PAGE
 %----------------------------------------------------------------------------------------
 
-\title{Generating a Terrain-Robustness Benchmark for Legged Locomotion:
-A Prototype via Terrain Authoring and Active Learning (ICRA 2023)}
-\subtitle{Chong Zhang and Lizhi Yang}
+\title{Diffusion Generative Flow Samplers: Improving Learning Signals Through Partial Trajectory Optimization}
 
+\subtitle{Dinghuai Zhang*, Ricky T. Q. Chen, Cheng-Hao Liu, Aaron Courville \& Yoshua Bengio}
 \author{Thomas Mousseau} 
 
 % \institute
@@ -61,7 +57,6 @@ A Prototype via Terrain Authoring and Active Learning (ICRA 2023)}
 \section{Problem Setup}
 
 \subsection{Legged Locomotion Challenges}
-% Add content: Introduce robotics context, terrain variability, and real-world examples.
 
 \begin{frame}{Legged Locomotion Challenges}
     \begin{block}{Emerging Topic in Legged Robotics}
