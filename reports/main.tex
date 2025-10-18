@@ -6,7 +6,7 @@
 \setbeameroption{show notes} %TODO: Thomas a enlever avant la presentation
 \usetheme{SimplePlus}
 
-\useoutertheme{miniframes}  % Adds navigation dots at the top for subsections
+\useoutertheme{miniframes}  % Adds horizontal navigation dots at the top for subsections
 
 \usecolortheme{} 
 
@@ -19,6 +19,9 @@
 \usepackage{graphicx} % Allows including images
 \usepackage{booktabs} % Allows the use of \toprule, \midrule and \bottomrule in tables
 \usepackage{array} % Allows >{\centering\arraybackslash} in tabular
+
+% Define hyphenation command
+\newcommand{\hyp}{-}
 
 %----------------------------------------------------------------------------------------
 %    TITLE PAGE
@@ -54,59 +57,261 @@
 \end{frame}
 
 %------------------------------------------------
-\section{Problem Setup}
 
-\subsection{Legged Locomotion Challenges}
+\section{Introduction}
 
-\begin{frame}{Legged Locomotion Challenges}
-    \begin{block}{Emerging Topic in Legged Robotics}
-        Terrain-aware locomotion has become an emerging topic in legged robotics. However, it is hard to generate diverse, challenging, and realistic unstructured terrains in simulation, which limits the way researchers evaluate their locomotion policies.
-    \end{block}
+\subsection{Problem Statement}
+
+\begin{frame}[t]{Sampling from Unnormalized Densities}
+\footnotesize
+\textbf{Goal.} Sample from a $D$-dimensional target with unnormalized density $\mu(x)$:
+\[
+\pi(x)=\frac{\mu(x)}{Z},\qquad Z=\int_{\mathbb R^D}\mu(x)\,dx\ \text{(unknown)}.
+\]
+We assume we can evaluate $\mu(x)$ (and sometimes $\nabla \log \mu(x)$), but we have no samples from $\pi$ and do not know $Z$.
+
+\medskip
+\textbf{Context.} We seek a \emph{sampler} (peer to MCMC/VI) that produces calibrated samples and, ideally, estimates of $\log Z$, \emph{without} any dataset from $\pi$.
+
+\vspace{0.2cm}
+
+% \textbf{Chemistry (small molecule conformers):} For any 3D shape \(x\) we can compute an energy \(E(x)\); sampling \(\pi(x)\propto e^{-\beta E(x)}\) gives the likely shapes and how often they occur (no dataset, \(Z\) unknown).
+
+\textbf{Chemistry (small-molecule conformers).} Use \emph{conformer strain/steric clash energy} as $E(x)$ for a 3D shape $x$ (lower when bonds/angles/rotations are comfortable). Sampling $\pi(x)\propto e^{-\beta E(x)}$ gives the \emph{population of stable rotamers} and how often each shape occurs at temperature $T$.
+
+\vspace{0.2cm}
+
+The integral for $Z$ over all 3D configurations is intractable, so we use the unnormalized score $\mu(x)=e^{-\beta E(x)}$, where $E(x)$ comes from chemistry/force-field physics (bonds, angles, nonbonded terms) and encodes how likely a conformation is, a lower $E$ means more likely.
+
+
+
+
+
+
+
+
 
 \end{frame}
 
-\subsection{GFlowNet's Role in Addressing Terrain Benchmarking Challenges}
-% Add content: Discuss current benchmarks' shortcomings and the need for generative methods.
 
-\begin{frame}{GFlowNet's Role in Addressing Terrain Benchmarking Challenges}
-    \begin{block}{Key Challenges for Terrain Benchmarking}
-        To achieve reliable quantification of robustness, terrain samples should resemble real terrains in the wild. The generation process should be controllable to produce high-quality terrains that are challenging to a user-specified extent. Finally, the sampler must maintain terrain quality and diversity simultaneously.
+
+\begin{frame}[t]{SOC formulation (part 1/2)}
+\footnotesize
+\textbf{Forward (controlled) process $Q$.} A Markov chain with Gaussian transitions:
+\[
+Q(x_{0:N}):\quad x_0\sim p_0^{\text{ref}},\quad x_{n+1}\sim P_F(\cdot\mid x_n)=\mathcal N\!\big(x_n + h\,f(x_n,n),\; h\sigma^2 I\big).
+\]
+
+\textbf{Reference process $Q^{\text{ref}}$.} Same covariance, zero drift:
+\[
+x_{n+1}\sim P_F^{\text{ref}}(\cdot\mid x_n)=\mathcal N\!\big(x_n,\; h\sigma^2 I\big),\qquad x_0\sim p_0^{\text{ref}},\ \ p_n^{\text{ref}}\text{ known.}
+\]
+
+\textbf{Target process $P$.} Tie the terminal marginal to $\pi$ via the reference:
+\[
+P(x_{0:N})\ :=\ Q^{\text{ref}}(x_{0:N})\;\frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)}.
+\]
+Then $P(x_N)\propto \mu(x_N)$, making $P$ a valid path-space target.
+\end{frame}
+
+\begin{frame}[t]{SOC formulation (part 2/2)}
+\footnotesize
+
+\medskip
+\textbf{Learning objective (discrete-time SOC).} Learn $f$ by minimizing the path KL:
+\[
+\min_{f}\ D_{\mathrm{KL}}(Q\ \|\ P)
+\;\;\Longleftrightarrow\;\;
+\min_{f}\ \mathbb E_{Q}\!\Big[\sum_{n=0}^{N-1}\frac{h}{2\sigma^2}\,\|f(x_n,n)\|^2\;+\;\log\Psi(x_N)\Big],
+\]
+with \(\Psi(x_N)=\dfrac{p_N^{\text{ref}}(x_N)}{\mu(x_N)}\).
+(Continuous-time limit recovers the classic VE-SDE SOC formulation.)
+\end{frame}
+
+\begin{frame}[t]{Why SOC, and what still hurts (motivation for DGFS)}
+\footnotesize
+\textbf{Why SOC/control-as-inference?}
+\begin{itemize}\itemsep3pt
+  \item Principled \emph{path-space} objective; $Z$ cancels, so only $\mu$ (and optionally $\nabla\log\mu$) is needed.
+  \item Calibrated sampling by \emph{steering} a simple reference process toward the target.
+\end{itemize}
+
+\textbf{Pain point in prior SOC samplers (PIS/DDS).}
+\begin{itemize}\itemsep3pt
+  \item Training signal sits \emph{only at terminal time} $N$ and losses use \emph{full trajectories} $\Rightarrow$ poor credit assignment, high variance, weaker mode coverage.
+\end{itemize}
+
+\textbf{DGFS in one line.}
+\begin{itemize}\itemsep3pt
+  \item Keep the same SOC/path-KL setup, but introduce a learned \emph{flow function} $F_n(x_n)$ and enforce \emph{subtrajectory balance} to inject \emph{intermediate} learning signals and enable \emph{partial-trajectory} training.
+\end{itemize}
+\end{frame}
+
+
+% \section{Introduction}
+
+% \subsection{Problem Statement}
+
+% \begin{frame}[t]{Problem Setting: Sampling from Unnormalized Densities}
+% \footnotesize
+% \textbf{Goal.} Given only an \emph{energy oracle} $E(x)$, sample from the unnormalized target
+% \[
+% \pi(x)\ \propto\ e^{-E(x)} \quad\text{with}\quad Z=\int e^{-E(x)}dx\ \text{(unknown)}.
+% \]
+% We want a \emph{sampler} (like MCMC/VI) that produces calibrated samples and, ideally, estimates of $\log Z$.
+
+% \medskip
+% \textbf{Classical paradigms we compare against.}
+% \begin{itemize}\itemsep2pt
+%   \item \textbf{MCMC:} Metropolis--Hastings, Langevin/HMC, SMC. \emph{Pros:} asymptotically correct, only needs $\mu=e^{-E}$. \emph{Cons:} mixing/geometry barriers.
+%   \item \textbf{VI:} mean-field, \textit{normalizing flows}, amortized VI. \emph{Pros:} fast, amortizable, ELBO bound. \emph{Cons:} bias from variational family, mode-seeking.
+% \end{itemize}
+
+% \medskip
+% \textbf{Our stance.} We build a \emph{sampling algorithm} inspired by diffusion models’ transport view, but \emph{not} a data-trained generator: no dataset from $\pi$, only the energy $E$.
+% \end{frame}
+
+% \begin{frame}[t]{Diffusion-inspired SOC sampler (and its pain point)}
+% \footnotesize
+% \textbf{Diffusion inspiration (transport by time-reversal).}
+% Forward reference: $dx_t=\sigma\,dW_t$ (or VP/VE variants). Reverse-time generative dynamics:
+% \[
+% dx_t=\big[f(x,t)-\sigma^2\nabla_x\log p_t(x)\big]\,dt+\sigma\,d\bar W_t.
+% \]
+% With \emph{data}, the score $\nabla\log p_t$ is learned by DSM. \emph{Here we have no data from $\pi$}, so DSM is inapplicable.
+
+% \medskip
+% \textbf{Control-as-inference (our solution path).}
+% Treat sampling as \emph{steering} a simple reference process $Q$ with control $u_\theta$:
+% \[
+% x_{n+1}=x_n+h\,u_\theta(n,x_n)+\sqrt{2\sigma^2 h}\,\varepsilon_n,\qquad
+% dx_t=u_\theta(t,x_t)\,dt+\sigma\,dW_t.
+% \]
+% Train by minimizing a \emph{path-space KL} where $Z$ cancels:
+% \[
+% \mathcal L(\theta)=\mathbb E_{\tau\sim P_\theta}\!\big[\log P_\theta(\tau)-\log Q(\tau)-\log \mu(x_N)\big]+\text{const},
+% \]
+% so we can use $\mu=e^{-E}$ (and optionally $\nabla\log\mu$) directly. Samples are obtained by simulating the \emph{controlled} process.
+
+% \medskip
+% \textbf{Remaining pain point (motivates DGFS).}
+% Path-KL training in prior work (PIS/DDS) delivers a \emph{single, terminal-time} signal and requires \emph{full trajectories} $\Rightarrow$ \textbf{sluggish credit assignment} and high-variance gradients.
+% % (Next: DGFS injects intermediate supervision via a learned flow and subtrajectory balance.)
+% \end{frame}
+
+
+
+% \begin{frame}[t]{Why view diffusion as SOC / Control-as-Inference?}
+% \footnotesize
+% \textbf{Goal.} Turn sampling from unnormalized $\pi(x)\propto\mu(x)$ into \emph{steering} a simple diffusion toward $\mu$ with a principled objective.
+
+% \medskip
+% \textbf{Objective (path-space KL):}
+% \[
+% \min_\theta\ \mathrm{KL}\!\Big(P_\theta(\tau)\,\Big\|\,Q(\tau)\tfrac{\mu(x_N)}{Z}\Big)
+% = \mathbb E_{P_\theta}\!\big[\log P_\theta(\tau)-\log Q(\tau)-\log\mu(x_N)\big]+\mathrm{const}.
+% \]
+
+% \textbf{Benefits.}
+% \begin{itemize}\itemsep3pt
+%   \item \textbf{No partition function:} $Z$ cancels inside the KL.
+%   \item \textbf{Temporal decomposition:} induce local/Bellman or flow-balance constraints $\Rightarrow$ intermediate signals, better credit assignment.
+%   \item \textbf{Off-policy friendly:} optimize a path measure; exploration controlled via KL-to-reference.
+%   \item \textbf{Theory leverage:} links to Schr\"odinger bridges and entropy-regularized OT for guarantees and algorithms.
+% \end{itemize}
+
+% \textbf{DGFS angle.} Add a learned flow $F_n$ to enforce \emph{subtrajectory} balance, bringing GFlowNet-style intermediate supervision into diffusion control.
+% \end{frame}
+
+
+\subsection{Limitations of Prior Work}
+
+\begin{frame}[t]{Prior Work \& Limitations}
+\textbf{SOC framing via SDEs.} Representing diffusion models as controlled SDEs lets us cast sampling as a stochastic optimal control (SOC) or control-as-inference problem (minimize a KL over \emph{path measures}).
+
+\medskip
+\textbf{Path Integral Sampler (PIS).}
+\begin{itemize}
+  \item Uses Schr\"odinger bridge / path-integral control to learn $u_\theta$ that transports a reference diffusion to match $\pi$ at time $N$.
+  \item Principled \emph{trajectory-space} objective that works with \emph{unnormalized} $\mu$; supports off-policy training.
+  \item \textit{Limitation:} Objective requires \emph{full trajectories} and rewards at terminal time only \(\Rightarrow\) sluggish credit assignment, higher gradient variance.
+\end{itemize}
+
+\textbf{Denoising Diffusion Samplers (DDS).}
+\begin{itemize}
+  \item Also recast sampling as control over the forward path; improves practical sampling and stability vs. vanilla diffusion heuristics.
+  \item \textit{Limitation:} Still optimized in \emph{trajectory space} with \emph{terminal-time} learning signals; inherits credit-assignment and variance issues.
+\end{itemize}
+
+\medskip
+\textbf{Takeaway.} Moving to the trajectory space gives us \underline{a principled KL objective over paths and compatibility with unnormalized targets}, but at the cost of \underline{terminal-time credit assignment \& high-variance training signals}. This motivates adding \emph{intermediate} supervision and \emph{partial-trajectory} learning (what DGFS provides).
+\end{frame}
+
+
+%------------------------------------------------
+\section{Methodology}
+
+\subsection{DGFS framework}
+
+\begin{frame}{DGFS Core}
+    \begin{block}{Trajectories with Learned Flow $F_n$}
+        DGFS uses trajectories guided by a learned flow $F_n$ for sampling.
     \end{block}
     \begin{itemize}
-        \item GFlowNet ensures high-quality terrains and diversity among those included in the final benchmark by providing probabilistic sampling from unnormalized distributions.
-        \item It addresses realism through flow-based modeling of complex terrains.
-        \item Controllability via reward-guided active learning for user-specified challenges.
-        \item Quality-diversity balance through efficient exploration of terrain spaces.
+        \item Partial-trajectory updates via SubTB (Subtrajectory Balance).
+        \item Intermediate training signals for better credit assignment.
+        \item Controlled forward process and subtrajectory balance constraint.
+        \item Partition-function estimator for evaluation.
+        \item Two nets: Drift f and scalar flow $F_n$.
+        \item Training setup, step embeddings, and cost vs. inference speed trade-offs.
     \end{itemize}
 \end{frame}
-%------------------------------------------------
-\section{Methodology and Architecture}
 
-\subsection{Conditional GAN for Terrain Generation}
-% Add content: Explain procedural terrain generation and parameters.
+\subsection{Why It Works}
 
-\subsection{GFlowNet and Active Learning}
-% Add content: Detail GFlowNet's role in sampling, flow matching, and the active learning loop.
-
-%------------------------------------------------
-
-%------------------------------------------------
-
-\section{Evaluations and Results}
-
-\subsection{Diversity and Quality of Generated Terrains}
-% Add content: Describe simulation environments, metrics, and robot models.
-
-\subsection{Sample Efficiency and Benchmarking Performance}
-% Add content: Present benchmarks, performance comparisons, and ablation studies.
+\begin{frame}{Why It Works}
+    \begin{block}{Evidence for Effectiveness}
+        DGFS reduces gradient variance and improves stability.
+    \end{block}
+    \begin{itemize}
+        \item Lower gradient variance through partial trajectories.
+        \item Better mode coverage and stability in sampling.
+        \item Compatibility with off-policy exploration.
+    \end{itemize}
+\end{frame}
 
 %------------------------------------------------
+\section{Results and Limitations}
+
+\subsection{Results}
+
+\begin{frame}{Results}
+    \begin{block}{Key Findings}
+        Evaluation of log Z bias across various targets.
+    \end{block}
+    \begin{itemize}
+        \item Visual grids for distributions like MoG (Mixture of Gaussians) and Manywell.
+        \item Key ablations on training components and hyperparameters.
+    \end{itemize}
+\end{frame}
+
+\subsection{Limitations \& Open Questions}
+
+\begin{frame}{Limitations \& Open Questions}
+    \begin{block}{Challenges and Future Work}
+        Designing intermediate signals remains an open problem.
+    \end{block}
+    \begin{itemize}
+        \item Scaling to high-dimensional and costly $\mu$ (target distributions).
+        \item Fixed backward policy $P_B$ limits flexibility.
+    \end{itemize}
+\end{frame}
 
 %------------------------------------------------
 \section{Conclusion}
 
 \subsection{Key Insights}
-% Add content: Summarize GFlowNet's impact and paper's contributions.
+% Add content: Summarize DGFS's impact and paper's contributions.
 
 \subsection{Future Directions and Usage since its release}
 % Add content: Discuss limitations, extensions, and personal thoughts.
