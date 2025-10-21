@@ -11,7 +11,7 @@
 \usecolortheme{} 
 
 \setbeamercolor{block title}{bg=structure,fg=white}  % Navy blue background for block titles
-\setbeamercolor{block body}{bg=structure!10,fg=structure}  % Light navy tint for block body
+\setbeamercolor{block body}{bg=structure!10,fg=black}  % Light navy tint for block body
 
 \definecolor{darkwine}{RGB}{128,0,32}  % Dark red wine
 \newenvironment{errorblock}[1]{%
@@ -283,8 +283,175 @@ we will be using this discrete-time objective as our loss function to optimize t
 
 \begin{frame}[t]{Credit Assignment Problem in Path Space}
 \footnotesize
+\begin{errorblock}{Current Loss Function}
+\[
+\min_{f}\ \mathbb E_Q\!\Big[\sum_{n=0}^{N-1}\tfrac{h}{2\sigma^2}\|f(x_n,n)\|^2\;+\;\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\Big]
+\]
+\end{errorblock}
+
+\textbf{Explanation.} Since we are guiding our trajectory using the terminal marginal distribution $p_N^{\text{ref}}$ and $\mu(x)$, the only signal we have is at the end. Thus, when we do the chain rule for backpropagation through time, it is very hard to know which decision at which time step got the right or wrong action (credit assignment problem).
+
+%running cost + terminal potential show optimal control base cost fucntion
+\end{frame}
+
+\begin{frame}{GFlowNet's perspective on DGFS}
+\footnotesize
+
+\textbf{Recap of GFlowNets.} GFlowNets learn to sample from unnormalized distributions by modeling flows on a DAG.
+
+\begin{itemize}\itemsep2pt
+  \item \textbf{DAG Structure:} Define a DAG $G = (S, A)$ with states $S$ and directed edges $s \to s' \in A$.
+  \item \textbf{Trajectories:} Complete trajectories $\tau = s_0 \to s_1 \to \dots \to s_T$ from start to terminal states.
+  \item \textbf{Forward Policy:} $P_F(s' | s)$, the probability of transitioning from $s$ to $s'$.
+  \item \textbf{Terminal Marginal:} $P_T(x) = \sum_{\tau \text{ ending at } x} P_F(\tau)$, the marginal over terminating states.
+  \item \textbf{Goal:} Learn $P_F$ such that $P_T(x) \propto R(x)$, where $R(x)$ is the unnormalized reward/density, and $Z = \sum_x R(x)$.
+\end{itemize}
 
 \end{frame}
+
+\begin{frame}[t]{SOC as a GFlowNet}
+\footnotesize
+
+\textbf{Comparison Table: GFlowNet vs. SOC Framework}
+
+\begin{table}[h]
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Concept} & \textbf{GFlowNet} & \textbf{SOC} \\
+\midrule
+\textbf{Forward Process} & Trajectory sampling on DAG & Controlled diffusion path \\
+\textbf{Forward Transition Probability} & $P_F(s' | s)$ & $P_F(x_{n+1} | x_n) = \mathcal{N}(x_{n+1}; x_n + h f(x_n), h\sigma^2 I)$ \\
+\textbf{Reward Function} & $R(x)$ (unnormalized) & $\mu(x)$ (unnormalized density) \\
+\textbf{Terminal Marginal Distribution} & $P_T(x) \propto R(x)$ & $Q(x_N) \propto \mu(x_N)$ \\
+\textbf{Flow State} & Flow $F(s)$ at states & Learned flow $F_n(x)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Insight.} Since SOC can be viewed as a GFlowNet, we can apply GFlowNet tools (e.g., detailed balance loss, subtrajectory balance) to solve the credit assignment problem in diffusion sampling.
+
+\end{frame}
+
+\begin{frame}[t]{Insight in solving credit assignment problem}
+\footnotesize
+
+\textbf{What if we could know or approximate the target distribution at any step $n$?}
+
+\[
+P(x_0, \dots, x_N) := Q^{\text{ref}}(x_0, \dots, x_N) \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)}.
+\]
+
+Using the reference bridge decomposition:
+\[
+Q^{\text{ref}}(x_{0:N}) = Q^{\text{ref}}(x_{0:N-1} | x_N) \, p_N^{\text{ref}}(x_N),
+\qquad p_N^{\text{ref}}(x_N) = \int Q^{\text{ref}}(x_{0:N}) \, dx_{0:N-1}.
+\]
+
+\[
+P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} P_B(x_n | x_{n+1}),
+\]
+
+Unfortunately, although we know the form of $P_B(\cdot|\cdot)$, for general target distribution there is generally no known analytical expression for it. As a result, we propose to use a deep neural network $F_n(\cdot; \theta)$ with parameter $\theta$ as a “helper” to approximate the unnormalized density of the $n$-th step target $p_n(\cdot)$.
+\end{frame}
+
+\begin{frame}[t]{Training the Flow Network: Naive Approach}
+\footnotesize
+
+\textbf{Naive Way to Train $F_n(\cdot; \theta)$.} One simple method is to fit $F_n$ to a Monte Carlo (MC) quadrature estimate of the integral in Equation 11 (which approximates the unnormalized density at step $n$).
+
+\textbf{Why Not?} Every training step requires a computationally expensive quadrature calculation (e.g., sampling many trajectories to estimate the integral). This makes the algorithm extremely inefficient, as MC quadrature is slow and scales poorly with dimensionality.
+
+\textbf{Decision.} Instead of direct quadrature per step, amortize the computation by turning it into an optimization problem that learns $F_n$ end-to-end.
+
+\end{frame}
+
+\begin{frame}[t]{Amortized Training: The Subtrajectory Constraint}
+\footnotesize
+
+\textbf{Proposed Amortized Approach.} Train $F_n(\cdot; \theta)$ to satisfy the following constraint for all partial trajectories $x_{n:N}$:
+\[
+F_n(x_n; \theta) \prod_{l=n}^{N-1} P_F(x_{l+1} | x_l; \theta) = \mu(x_N) \prod_{l=n}^{N-1} P_B(x_l | x_{l+1}).
+\]
+
+\textbf{Details.}
+\begin{itemize}\itemsep2pt
+  \item $P_F$ (forward policy) and $F_n$ are parameterized by deep neural networks.
+  \item Once this constraint holds, $F_n(x_n; \theta)$ equals the integral in Equation 11, amortizing the integration into the learning of $\theta$.
+  \item We use only $\mu(\cdot)$ (no $Z$), so the unknown normalization is absorbed into $F_n$.
+\end{itemize}
+
+\textbf{Decision.} This avoids per-step quadrature by enforcing a global constraint on partial trajectories, making training efficient and scalable.
+
+\end{frame}
+
+\begin{frame}[t]{Training Objective and Implementation}
+\footnotesize
+
+\textbf{Training Objective.} Regress the left-hand side (LHS) of the constraint to the right-hand side (RHS). For stability, perform this in log space:
+\[
+\min_\theta \left| \log(\text{LHS}) - \log(\text{RHS}) \right|.
+\]
+
+\textbf{Details.}
+\begin{itemize}\itemsep2pt
+  \item This is a regression loss that minimizes the difference between the learned flow products and the target products involving $\mu$.
+  \item Log space prevents numerical issues from large or small values.
+\end{itemize}
+
+\textbf{Shared Parameters.} The flow function at different steps shares the same parameters; achieved by adding a step embedding input to the network $F(\cdot, n; \theta)$.
+
+\textbf{Decision.} Sharing parameters reduces model complexity and ensures consistency across time steps, while embeddings allow step-specific behavior.
+
+\end{frame}
+
+\begin{frame}[t]{Derived Subtrajectory Balance (SubTB)}
+\footnotesize
+
+\textbf{Deriving SubTB.} Comparing the constraint for $n$ and $n+1$ gives a formula independent of $\mu$:
+\[
+F_n(x_n; \theta) P_F(x_{n+1} | x_n; \theta) = F_{n+1}(x_{n+1}; \theta) P_B(x_n | x_{n+1}).
+\]
+
+\textbf{Details.}
+\begin{itemize}\itemsep2pt
+  \item This is the Subtrajectory Balance (SubTB) constraint, a generalization of detailed balance for partial trajectories.
+  \item It provides intermediate learning signals without needing $\mu$ directly, improving credit assignment.
+\end{itemize}
+
+\textbf{Overall Decision.} The method learns two neural networks: the flow $F(\cdot, n; \theta)$ and the forward policy $P_F$. This setup enables efficient, stable training with intermediate supervision.
+
+\end{frame}
+
+\begin{frame}[t]{DGFS algorithm}
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\textwidth]{figures/algo.png}
+    \end{figure}
+
+\end{frame}
+
+% \begin{frame}[t]{Intermediate Learning Signals}
+
+% \footnotesize
+% \textbf{Key Idea.} Instead of waiting for the final signal, DGFS uses \emph{subtrajectory balance (SubTB)} to provide intermediate learning signals by optimizing over partial trajectories.
+
+% \begin{block}{Detailed Balance (DB) Loss in GFlowNets}
+% \[
+% \ell_{\text{DB}}(s, s'; \theta) = \left( \log \frac{F(s; \theta) P_F(s'|s; \theta)}{F(s'; \theta) P_B(s|s'; \theta)} \right)^2
+% \]
+% According to the theory of GFlowNets (Bengio et al., 2023), if the DB loss reaches 0 for any transition pair, then the forward policy samples correctly from the target distribution defined by R(·).
+
+% \end{block}
+
+% \begin{itemize}
+%     \item s and s' are two states in the trajectory (e.g., $x_n$ and $x_{n+1}$).
+%     \item F(s; $\theta$) is the learned flow function at state s, $P_F(s'|s; \theta)$ is the forward transition probability from s to s', and $P_B(s|s'; \theta)$ is the backward transition probability from s' to s.
+% \end{itemize}
+
+% \end{frame}
 
 
 %------------------------------------------------
