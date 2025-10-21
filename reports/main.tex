@@ -168,6 +168,41 @@ Q^{\text{ref}}(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F^{\text{
 \textbf{Goal.} Learn $f$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown).
 \end{frame}
 
+\begin{frame}[t]{Target Path Measure via Importance Sampling}
+\footnotesize
+
+\textbf{Importance Sampling Basics.} Importance sampling is a technique to estimate expectations under a hard-to-sample target distribution \( P \) using samples from an easy-to-sample proposal distribution \( Q \). The key formula is:
+\[
+\mathbb{E}_{x \sim Q} \left[ f(x) \cdot w(x) \right] = \mathbb{E}_{x \sim P} [f(x)],
+\]
+where the \textcolor{red}{\emph{importance weight} \( w(x) = \frac{P(x)}{Q(x)} \)} corrects the samples from \( Q \) to behave as if they were from \( P \).
+
+\textbf{Intuition.} \( Q \) provides "biased" samples; \( w(x) \) upweights samples that are likely under \( P \) and downweights those that aren't, effectively resampling from \( P \) without directly sampling it.
+
+\textbf{Application to Path Measures.} In our case, the "samples" are entire trajectories \( x_{0:N} \), and we want the path measure \( P \) to have the correct terminal marginal \( \pi(x_N) \propto \mu(x_N) \). We use the reference path measure \( Q^{\text{ref}} \) (easy to sample, e.g., Gaussian paths) as the proposal. The reweighted path measure is:
+\[
+P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \cdot w(x_{0:N}),
+\]
+where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This ensures \( P(x_N) \propto \mu(x_N) \), as the weight depends only on the endpoint.
+
+\end{frame}
+
+% \begin{frame}[t]{Target Path Measure via IS (Part 2)}
+% \footnotesize
+
+% \textbf{What Each Term Does.}
+% \begin{itemize}\itemsep2pt
+%   \item \( Q^{\text{ref}}(x_{0:N}) \): The proposal path measure—provides the base trajectories (e.g., uncontrolled diffusion). It's the "easy" distribution we sample from.
+%   \item \( \pi(x_N) \): The target terminal density (normalized). It steers the paths toward high-probability endpoints under the true distribution.
+%   \item \( p^{\text{ref}}_N(x_N) \): The reference terminal marginal (known, e.g., Gaussian). It normalizes the weight so the reweighted measure integrates to 1 and corrects for the proposal's bias at the endpoint.
+% \end{itemize}
+
+% \textbf{Why This Achieves the Goal.} The weight \( w(x_{0:N}) \) adjusts the path probabilities so that trajectories ending in regions with high \( \mu(x_N) \) are favored, while those in low-\( \mu \) regions are penalized. This "importance resamples" the paths to match the target terminal distribution, without needing samples from \( \pi \).
+
+% \textbf{Connection to Girsanov Theorem.} This reweighting is formalized by the **Girsanov theorem** in stochastic calculus, which allows changing the drift of a diffusion process by reweighting the path measure with an exponential martingale. Here, the weight \( \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \) corresponds to the Radon-Nikodym derivative that shifts the process from the reference (zero-drift) to one with the desired terminal behavior. It's not just importance sampling—it's a rigorous change-of-measure for continuous-time processes, ensuring the reweighted paths are absolutely continuous and the terminal marginal is exact.
+
+% \end{frame}
+
 % --- Slide 2 ---
 \begin{frame}[t]{Step 3: Path target \& KL $\Rightarrow$ SOC objective}
 \scriptsize
@@ -334,36 +369,94 @@ we will be using this discrete-time objective as our loss function to optimize t
 
 \end{frame}
 
-\begin{frame}[t]{Insight in solving credit assignment problem}
+% \begin{frame}[t]{Insight in solving credit assignment problem}
+% \footnotesize
+
+% \textbf{What if we could know or approximate the target distribution at any step $n$?}
+
+% \[
+% P(x_0, \dots, x_N) := Q^{\text{ref}}(x_0, \dots, x_N) \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)}.
+% \]
+
+% Using the reference bridge decomposition:
+% \[
+% Q^{\text{ref}}(x_{0:N}) = Q^{\text{ref}}(x_{0:N-1} | x_N) \, p_N^{\text{ref}}(x_N),
+% \qquad p_N^{\text{ref}}(x_N) = \int Q^{\text{ref}}(x_{0:N}) \, dx_{0:N-1}.
+% \]
+
+% \[
+% P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} P_B(x_n | x_{n+1}),
+% \]
+
+% \small
+% \textbf{Key fact.} Because the terminal reweighting only touches $x_N$, the backward kernel of $P$ at intermediate steps equals the \emph{reference} backward kernel (a Gaussian bridge for our reference).\\
+% \textbf{Hard part.} The intermediate marginal $p_n(x_n)$ has no closed form in general $\Rightarrow$ we amortize it via a learned $F_n(x_n)$.
+
+% Unfortunately, although we know the form of $P_B(\cdot|\cdot)$, for general target distribution there is generally no known analytical expression for it. As a result, we propose to use a deep neural network $F_n(\cdot; \theta)$ with parameter $\theta$ as a “helper” to approximate the unnormalized density of the $n$-th step target $p_n(\cdot)$.
+% \end{frame}
+
+\begin{frame}[t]{Decomposition of the Target Process}
 \footnotesize
 
-\textbf{What if we could know or approximate the target distribution at any step $n$?}
-
+\textbf{Target Process Decomposition.} The target path measure (Equation 4) can be decomposed into a product of conditional distributions:
 \[
-P(x_0, \dots, x_N) := Q^{\text{ref}}(x_0, \dots, x_N) \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)}.
+P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)} \implies P(x_N) \propto \mu(x_N).
 \]
 
-Using the reference bridge decomposition:
+\textbf{Conditional Form (Equation 10).} Since the reweighting only affects the terminal state, the joint can be written as:
 \[
-Q^{\text{ref}}(x_{0:N}) = Q^{\text{ref}}(x_{0:N-1} | x_N) \, p_N^{\text{ref}}(x_N),
-\qquad p_N^{\text{ref}}(x_N) = \int Q^{\text{ref}}(x_{0:N}) \, dx_{0:N-1}.
+P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} P_B^{\text{ref}}(x_n | x_{n+1}),
 \]
+where $P_B^{\text{ref}}(\cdot | \cdot)$ is the backward transition probability (derived from the target joint). This is tractable because $P_B^{\text{ref}}$ is known (e.g., a Gaussian bridge for diffusion processes).
 
-\[
-P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} P_B(x_n | x_{n+1}),
-\]
+\textbf{Intuition.} This factorization shows that the target process is like sampling backward from the terminal distribution $\pi(x_N)$, using the backward kernel to condition earlier states. It's analogous to reverse-time diffusion, where we start from the target and go backward.
 
-Unfortunately, although we know the form of $P_B(\cdot|\cdot)$, for general target distribution there is generally no known analytical expression for it. As a result, we propose to use a deep neural network $F_n(\cdot; \theta)$ with parameter $\theta$ as a “helper” to approximate the unnormalized density of the $n$-th step target $p_n(\cdot)$.
 \end{frame}
 
-\begin{frame}[t]{Training the Flow Network: Naive Approach}
-\footnotesize
+\begin{frame}[t]{Rewriting the Target Process with Marginal}
+\tiny
 
-\textbf{Naive Way to Train $F_n(\cdot; \theta)$.} One simple method is to fit $F_n$ to a Monte Carlo (MC) quadrature estimate of the integral in Equation 11 (which approximates the unnormalized density at step $n$).
+\textbf{Rewriting the Joint Using Marginal Densities.} The backward factorization of the target process is:
+\[
+P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} P_B^{\text{ref}}(x_n | x_{n+1}).
+\]
 
-\textbf{Why Not?} Every training step requires a computationally expensive quadrature calculation (e.g., sampling many trajectories to estimate the integral). This makes the algorithm extremely inefficient, as MC quadrature is slow and scales poorly with dimensionality.
+To express it in terms of the marginal densities $p_n(x_n)$, note that the marginal at step $n$ is obtained by integrating out the future states $x_{n+1:N}$ from the joint:
+\[
+p_n(x_n) = \int P(x_{0:N}) \, dx_{0:n-1} \, dx_{n+1:N} = \int \pi(x_N) \prod_{l=n}^{N-1} P_B^{\text{ref}}(x_l | x_{l+1}) \, dx_{n+1:N} \propto \int \mu(x_N) \prod_{l=n}^{N-1} P_B^{\text{ref}}(x_l | x_{l+1}) \, dx_{n+1:N}.\]
+This shows that $p_n(x_n)$ is the "unnormalized" density at step $n$, propagated backward from the terminal $\pi(x_N)$ via the backward transitions.
 
-\textbf{Decision.} Instead of direct quadrature per step, amortize the computation by turning it into an optimization problem that learns $F_n$ end-to-end.
+\textbf{What $p_n(x_n)$ Represents.} 
+\begin{itemize}\itemsep2pt
+  \item $p_N(x_N) = \pi(x_N)$: The terminal marginal, which is the normalized target density we want to match (proportional to $\mu(x_N)$).
+  \item For $n < N$, $p_n(x_n)$ is the marginal density at step $n$ under the target process $P$. It represents how likely the state $x_n$ is at time $n$, given that the trajectory will eventually reach a terminal state distributed as $\pi(x_N)$. In other words, it's the distribution of $x_n$ marginalized over all possible future paths that lead to $\pi(x_N)$.
+  \item Intuitively, $p_n(x_n)$ encodes the "value" or importance of being at $x_n$ at step $n$, as it accounts for the probability of reaching high-$\mu$ terminals from there. This is why approximating $p_n(x_n)$ allows training with partial trajectories starting from step $n$.
+\end{itemize}
+
+\textbf{Why This Helps in Writing the Target Process.} The joint $P(x_{0:N})$ can be thought of as a chain where each $p_n(x_n)$ summarizes the "progress" toward the terminal, but the backward form directly ties it to $\pi(x_N)$. By learning $F_n \approx p_n$, we can reconstruct or approximate the joint without computing the full integral, enabling efficient partial-trajectory optimization.
+
+\end{frame}
+
+\begin{frame}[t]{Rewriting the Target Process with Marginal}
+\tiny
+
+\textbf{If We Had Access to $p_n(x_n)$.} We could write the partial joint as:
+\[
+P(x_{0:n}) = p_n(x_n) \prod_{k=0}^{n-1} P_B(x_k | x_{k+1}),
+\]
+where $P_B$ is the backward kernel. This would allow us to define partial trajectory targets, enabling training with shorter trajectories and better credit assignment.
+
+\textbf{But There's No Closed Form for $p_n(x_n)$.} To calculate $p_n(x_n)$, we would need to compute the integral:
+\[
+p_n(x_n) = \int \pi(x_N) \prod_{l=n}^{N-1} P_B(x_l | x_{l+1}) \, dx_{n+1:N}.
+\]
+This is a high-dimensional integral with no analytical solution for general $\pi$.
+
+\textbf{Why Parameterize Both $F_n(\theta)$ and $P_F$?} The constraint requires both: $F_n$ approximates $p_n$, and $P_F$ is the forward policy we learn. We can't simply calculate the forward process because it's unknown—we're learning it to steer trajectories toward the target. Parameterizing both allows the constraint to hold, enabling amortized learning without per-step integrals.
+
+\textbf{Naive Alternative: Monte Carlo Quadrature.} Quadrature is a numerical integration method that approximates integrals by evaluating the integrand at a set of points (nodes) and weighting them. Monte Carlo quadrature uses random sampling for high dimensions.
+
+\textbf{Why Expensive.} Quadrature requires many evaluations of the integrand (e.g., sampling trajectories), which is computationally intensive and scales poorly with dimensionality, making it impractical for per-training-step use as a replacement for $p_n$.
 
 \end{frame}
 
