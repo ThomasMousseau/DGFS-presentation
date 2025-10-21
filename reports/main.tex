@@ -216,105 +216,75 @@ P(x_{0:N}) \;\propto\; Q^{\text{ref}}(x_{0:N})\,\frac{\mu(x_N)}{p^{\text{ref}}_N
 \[
 \boxed{\ \min_{f}\ \mathbb E_Q\!\Big[\sum_{n=0}^{N-1}\tfrac{h}{2\sigma^2}\|f(x_n,n)\|^2\;+\;\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\Big]\ }
 \]
+
+we will be using this discrete-time objective as our loss function to optimize the drift $f$. Thus we can model the drift with a neural network $f_\theta$ and optimize the parameters $\theta$ backpropagating through time (BPTT) while avoiding to use the stochastic-adjoint method necessary for a neural SDE.
 \end{frame}
 
+%!Diffusion Denoising Score Matching slides removed for brevity 
+% \begin{frame}[t]{Diffusion Process}
+% \scriptsize
 
-\begin{frame}[t]{Diffusion Process}
-\scriptsize
+% \textbf{Idea.} Let the target “diffuse to Gaussian” via a reference process (VP/VE SDE). The \emph{reverse-time} dynamics can, in principle, generate target samples if we know the \emph{score} $\nabla_x \log p_t(x)$:
+% \[
+% \underbrace{dx_t=\sigma\,dW_t}_{\text{forward/noising}}
+% \quad\Longleftrightarrow\quad
+% \underbrace{dx_t=\big[f_{\text{ref}}(x,t)-\sigma^2\nabla_x \log p_t(x)\big]dt+\sigma\,d\bar W_t}_{\text{reverse/generative}}.
+% \]
 
-\textbf{Idea.} Let the target “diffuse to Gaussian” via a reference process (VP/VE SDE). The \emph{reverse-time} dynamics can, in principle, generate target samples if we know the \emph{score} $\nabla_x \log p_t(x)$:
-\[
-\underbrace{dx_t=\sigma\,dW_t}_{\text{forward/noising}}
-\quad\Longleftrightarrow\quad
-\underbrace{dx_t=\big[f_{\text{ref}}(x,t)-\sigma^2\nabla_x \log p_t(x)\big]dt+\sigma\,d\bar W_t}_{\text{reverse/generative}}.
-\]
+% \textbf{What is score matching?} 
+% Learn a network $s_\theta(x,t)\approx \nabla_x\log p_t(x)$ by regressing on \emph{noised data}:
+% \[
+% \min_\theta\ \mathbb E_{t}\,\mathbb E_{x_0\sim p_{\text{data}}}\,\mathbb E_{\varepsilon}\!
+% \big\|s_\theta(x_t,t)-\nabla_x\log p_t(x_t)\big\|^2,
+% \]
+% which is equivalent to denoising a corrupted sample $x_t$ back toward $x_0$.
 
-\textbf{What is score matching?} 
-Learn a network $s_\theta(x,t)\approx \nabla_x\log p_t(x)$ by regressing on \emph{noised data}:
-\[
-\min_\theta\ \mathbb E_{t}\,\mathbb E_{x_0\sim p_{\text{data}}}\,\mathbb E_{\varepsilon}\!
-\big\|s_\theta(x_t,t)-\nabla_x\log p_t(x_t)\big\|^2,
-\]
-which is equivalent to denoising a corrupted sample $x_t$ back toward $x_0$.
+% \vspace{0.1cm}
+% \begin{errorblock}{Why Denoising Score Matching is \emph{not} applicable here}
+% \begin{itemize}\itemsep2pt
+%   \item We have \emph{no dataset} from $\pi$, only the unnormalized $\mu(x)$ (and maybe $\nabla\log\mu$).
 
-\vspace{0.1cm}
-\begin{errorblock}{Why Denoising Score Matching is \emph{not} applicable here}
-\begin{itemize}\itemsep2pt
-  \item We have \emph{no dataset} from $\pi$, only the unnormalized $\mu(x)$ (and maybe $\nabla\log\mu$).
+% \end{itemize}
+% \end{errorblock}
 
-\end{itemize}
-\end{errorblock}
+% \end{frame}
+% \begin{frame}[t]{Alternative to DSM: learn the vector field (control)}
+% \scriptsize
+% \textbf{Reverse SDE drift (generative side).}
+% \[
+% dx_t=\big[f_{\text{ref}}(x,t)-\sigma^2\,\nabla_x \log p_t(x)\big]\,dt+\sigma\,d\bar W_t.
+% \]
 
-\end{frame}
+% \textbf{DSM route (data world).} Learn the \emph{score} $s_\theta(x,t)\approx\nabla_x\log p_t(x)$ from noised \emph{data}, then plug it into the reverse drift.
 
-\begin{frame}[t]{Alternative to DSM: learn the vector field (control)}
-\scriptsize
-\textbf{Reverse SDE drift (generative side).}
-\[
-dx_t=\big[f_{\text{ref}}(x,t)-\sigma^2\,\nabla_x \log p_t(x)\big]\,dt+\sigma\,d\bar W_t.
-\]
+% \textbf{Vector-field route (our setting).} Directly learn the \emph{control/drift} $u_\theta(x,t)$ instead of the score. The two are \emph{equivalent} via:
+% \[
+% u_\theta(x,t)\;=\;f_{\text{ref}}(x,t)\;-\;\sigma^2\,s_\theta(x,t)
+% \quad\Longleftrightarrow\quad
+% s_\theta(x,t)\;=\;\tfrac{f_{\text{ref}}(x,t)-u_\theta(x,t)}{\sigma^2}.
+% \]
 
-\textbf{DSM route (data world).} Learn the \emph{score} $s_\theta(x,t)\approx\nabla_x\log p_t(x)$ from noised \emph{data}, then plug it into the reverse drift.
+% \textbf{Why do this here?}
+% \begin{itemize}\itemsep2pt
+%   \item We have no dataset from $\pi$, so DSM can’t form expectations over $p_t$; scores $\nabla\log p_t$ are unavailable.
+%   \item Instead, treat $u_\theta$ as a \emph{control} and \emph{learn it} by minimizing a $Z$-free \textit{path-space} KL that uses only the given $\mu(\cdot)$.
+%   \item This sets up diffusion samplers à la PIS/DDS and enables DGFS’s improvements (intermediate, subtrajectory credit).
+% \end{itemize}
 
-\textbf{Vector-field route (our setting).} Directly learn the \emph{control/drift} $u_\theta(x,t)$ instead of the score. The two are \emph{equivalent} via:
-\[
-u_\theta(x,t)\;=\;f_{\text{ref}}(x,t)\;-\;\sigma^2\,s_\theta(x,t)
-\quad\Longleftrightarrow\quad
-s_\theta(x,t)\;=\;\tfrac{f_{\text{ref}}(x,t)-u_\theta(x,t)}{\sigma^2}.
-\]
-
-\textbf{Why do this here?}
-\begin{itemize}\itemsep2pt
-  \item We have no dataset from $\pi$, so DSM can’t form expectations over $p_t$; scores $\nabla\log p_t$ are unavailable.
-  \item Instead, treat $u_\theta$ as a \emph{control} and \emph{learn it} by minimizing a $Z$-free \textit{path-space} KL that uses only the given $\mu(\cdot)$.
-  \item This sets up diffusion samplers à la PIS/DDS and enables DGFS’s improvements (intermediate, subtrajectory credit).
-\end{itemize}
-
-\textbf{Notation tip.} Use $u_\theta$ (or $f$) for the vector field to avoid clashing with $\mu(\cdot)$, which denotes the unnormalized density.
-\end{frame}
-
-
-\begin{frame}[t]{Sampling as a Stochastic Optimal Control problem}
-\footnotesize
-\textbf{Forward (controlled) process $Q$.} A Markov chain with Gaussian transitions:
-\[
-Q(x_{0:N}):\quad x_0\sim p_0^{\text{ref}},\quad x_{n+1}\sim P_F(\cdot\mid x_n)=\mathcal N\!\big(x_n + h\,f(x_n,n),\; h\sigma^2 I\big).
-\]
-
-\textbf{Reference process $Q^{\text{ref}}$.} Same covariance, zero drift:
-\[
-x_{n+1}\sim P_F^{\text{ref}}(\cdot\mid x_n)=\mathcal N\!\big(x_n,\; h\sigma^2 I\big),\qquad x_0\sim p_0^{\text{ref}},\ \ p_n^{\text{ref}}\text{ known.}
-\]
-
-\textbf{Target process $P$.} Tie the terminal marginal to $\pi$ via the reference:
-\[
-P(x_{0:N})\ :=\ Q^{\text{ref}}(x_{0:N})\;\frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)}.
-\]
-Then $P(x_N)\propto \mu(x_N)$, making $P$ a valid path-space target.
-\end{frame}
-
-\begin{frame}[t]{Sampling as a Stochastic Optimal Control problem}
-\footnotesize
-
-\medskip
-\textbf{Learning objective (discrete-time SOC).} Learn $f$ by minimizing the path KL:
-\[
-\min_{f}\ D_{\mathrm{KL}}(Q\ \|\ P)
-\;\;\Longleftrightarrow\;\;
-\min_{f}\ \mathbb E_{Q}\!\Big[\sum_{n=0}^{N-1}\frac{h}{2\sigma^2}\,\|f(x_n,n)\|^2\;+\;\log\Psi(x_N)\Big],
-\]
-with \(\Psi(x_N)=\dfrac{p_N^{\text{ref}}(x_N)}{\mu(x_N)}\).
-(Continuous-time limit recovers the classic VE-SDE SOC formulation.)
-\end{frame}
-
-
+% \textbf{Notation tip.} Use $u_\theta$ (or $f$) for the vector field to avoid clashing with $\mu(\cdot)$, which denotes the unnormalized density.
+% \end{frame}
 
 
 
 %------------------------------------------------
-\section{Methodology}
+\section{Diffusion Generative Flow Samplers}
 
-\subsection{DGFS framework}
+\subsection{Motivation: Credit Assignment in Path Space}
+
+\begin{frame}[t]{Credit Assignment Problem in Path Space}
+\footnotesize
+
+\end{frame}
 
 
 %------------------------------------------------
