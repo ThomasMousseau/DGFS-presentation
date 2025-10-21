@@ -69,9 +69,41 @@
 
 \subsection{Problem Statement}
 
+\begin{frame}[t]{Generative Modeling}
+\scriptsize
+\begin{block}{Task}
+    Sample from a complex (high-dimensional and multimodal) distribution $D$
+\end{block}
+
+$D$ can be given under the form of:
+
+\begin{columns}[t]
+\begin{column}{0.48\textwidth}
+\begin{itemize}\itemsep2pt
+    \item A dataset of samples $\{x_i\}_{i=1}^N \sim D$ (e.g., images, text, audio)
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\textwidth]{figures/score_diffusion.png}
+    \end{figure}
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\begin{itemize}\itemsep2pt
+    \item An unnormalized density $\mu(x)$ where $D$ has density $\pi(x) \propto \mu(x)$ (e.g., 
+    energy-based models, physics/chemistry)
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\textwidth]{figures/unconctrolled.png}
+    \end{figure}
+\end{itemize}
+\end{column}
+\end{columns}
+
+\end{frame}
+
 \begin{frame}[t]{Sampling from Unnormalized Densities}
 \footnotesize
-\textbf{Goal.} Sample from a $D$-dimensional target with unnormalized density $\mu(x)$:
+\textbf{Goal.} Sample from a $D$-dimensional target with unnormalized density $\mu(x)$ where $\mathbb R^D \to \mathbb R^+$.
 \[
 \pi(x)=\frac{\mu(x)}{Z},\qquad Z=\int_{\mathbb R^D}\mu(x)\,dx\ \text{(unknown)}.
 \]
@@ -88,144 +120,102 @@ We assume we can evaluate $\mu(x)$, but we have no samples from $\pi$ and do not
 \textbf{Chemistry (small-molecule conformers).} Different 3D conformations have a formation energy from force-field terms (bonds, angles, dihedrals, nonbonded); lower energy $\Rightarrow$ higher Boltzmann probability. A well-calibrated sampler is needed to draw conformers in proportion to these probabilities, which is important in binding-pose ranking/free-energy estimation, Boltzmann-weighted property prediction (e.g., NMR shifts), and generating diverse realistic 3D conformers for screening.
 \end{frame}
 
-\begin{frame}[t]{From sampling to control: reference dynamics}
+\begin{frame}[t]{Diffusion Generative Flow Samplers}
 \footnotesize
-\textbf{Reference (uncontrolled) diffusion.}
-\[
-dx_t=\sigma\,dW_t,\qquad x_0\sim \nu \ (\text{simple, e.g.\ Gaussian}).
-\]
-More generally, introduce a \emph{feedback control} $u_t=u(x_t,t)$:
-\[
-dx_t=u(x_t,t)\,dt+\sigma\,dW_t,\qquad x_0\sim \nu .
-\]
-Let $Q^{\text{ref}}$ be the path law of the uncontrolled process ($u\equiv 0$), with known terminal marginal $p_T^{\text{ref}}$.
-Our goal is to \emph{choose a control $u$ so that the terminal law of the controlled process matches the target} $\pi(x)\propto \mu(x)$.
+\textbf{Idea.} We will \emph{reframe sampling} from an unnormalized target $\pi(x)\propto \mu(x)$ as a \emph{stochastic optimal control (SOC)} problem: learn a control that steers a simple reference diffusion so its \emph{terminal marginal} matches $\pi$.
 
-\begin{figure}
-    \centering
-    \includegraphics[width=0.6\textwidth]{figures/unconctrolled.png}
-    \caption{Controlled diffusion process from simple $\nu$ to complex $\pi$.}
-\end{figure}
+\medskip
+\textbf{Why this helps.}
+\begin{itemize}\itemsep2pt
+  \item Gives a \emph{path-space} training objective/metric: a KL on trajectories $\mathrm{KL}(Q\,\|\,P)$ where $P$ is the reference paths reweighted by $\mu(x_T)$.
+  \item The \emph{partition function $Z$ cancels} inside this objective, so we can train using only $\mu$ (and optionally $\nabla\log\mu$).
+  \item Lets us optimize \emph{without samples from $\pi$} and still measure closeness to the true normalized endpoint.
+\end{itemize}
 
+\medskip
+\textbf{Caveat (sets up DGFS).} This path-KL places supervision \emph{only at the terminal time} $\Rightarrow$ poor \emph{credit assignment} and high-variance gradients.
 
+\medskip
+\textbf{DGFS fix (preview).} Inject \emph{intermediate} learning signals via a GFlowNet-inspired \emph{learned flow} and \emph{subtrajectory balance}, enabling partial-trajectory training and more stable learning.
 \end{frame}
 
-\begin{frame}[t]{SOC formulation}
-\scriptsize
-\textbf{SOC objective.} Choose a control $u$ to minimize
-\[
-\mathbb E_{Q^u}\!\left[\int_0^T \frac{1}{2\sigma^2}\|u(x_t,t)\|^2\,dt \;+\; \Psi(x_T)\right].
-\]
-
-\textbf{Pick the terminal cost to encode the target.}
-\[
-\Psi(x_T)\;=\;\log\frac{p_T^{\text{ref}}(x_T)}{\mu(x_T)}\quad
-\big(\text{equivalently }-\log\mu(x_T)\ \text{up to } \log p_T^{\text{ref}}\big).
-\]
-
-\textbf{Key theorem (path--KL $\Leftrightarrow$ SOC).}
-Define the \emph{target path measure} by terminal reweighting:
-\[
-P(x_{0:T})\ \propto\ Q^{\text{ref}}(x_{0:T})\ \frac{\mu(x_T)}{p_T^{\text{ref}}(x_T)}.
-\]
-Then, under standard regularity,
-\[
-\boxed{\;
-D_{\mathrm{KL}}(Q^u\|P)
-=\mathbb E_{Q^u}\!\Big[\int_0^T \tfrac{1}{2\sigma^2}\|u\|^2\,dt+\log\tfrac{p_T^{\text{ref}}(x_T)}{\mu(x_T)}\Big]\;+\;\text{const}
-\;}
-\]
-
-\end{frame}
-
+\subsection{Stochastic Optimal Control}
 
 % --- Slide 1 ---
-\begin{frame}[t]{Steps 1--2: Build forward \& reference diffusions}
+\begin{frame}[t]{Steps 1--2: Forward \& Reference in \textit{discrete time}}
 \footnotesize
-\textbf{Step 1 (controlled forward process).} Parameterize a sampler as a controlled diffusion:
+\textbf{Controlled forward transition (learned drift).}
 \[
-dx_t = f(x_t,t)\,dt + \sigma\,dW_t,\qquad x_0 \sim p^{\text{ref}}_0,
+P_F(x_{n+1}\mid x_n)\;=\;\mathcal N\!\big(x_{n+1};\;x_n + h\,f(x_n,n),\;h\sigma^2 I\big)
 \]
-with drift $f(\cdot,\cdot)$ (the control) to be learned. Let $Q$ denote the path law of this process.
+\textbf{Controlled path law.}
+\[
+Q(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F(x_{n+1}\mid x_n)
+\]
 
 \medskip
-\textbf{Step 2 (uncontrolled reference).} Use the same noise but zero drift:
+\textbf{Uncontrolled (reference) transition (zero drift).}
 \[
-dx_t = \sigma\,dW_t,\qquad x_0 \sim p^{\text{ref}}_0,
+P_F^{\text{ref}}(x_{n+1}\mid x_n)\;=\;\mathcal N\!\big(x_{n+1};\;x_n,\;h\sigma^2 I\big)
 \]
-whose marginals $p^{\text{ref}}_t$ are known in closed form. Let $Q^{\text{ref}}$ be its path law.
+\textbf{Reference path law and marginals.}
+\[
+Q^{\text{ref}}(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F^{\text{ref}}(x_{n+1}\mid x_n),
+\qquad p^{\text{ref}}_n(x)\;\text{is closed form.}
+\]
 
 \medskip
-\textbf{Goal.} Choose $f$ so that the terminal marginal of $Q$ matches the target $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown).
+\textbf{Goal.} Learn $f$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown).
 \end{frame}
 
 % --- Slide 2 ---
-\begin{frame}[t]{Step 3: Target path measure via terminal reweighting}
-\footnotesize
-\textbf{Construct a target measure on paths} by reweighting only the terminal state:
+\begin{frame}[t]{Step 3: Path target \& KL $\Rightarrow$ SOC objective}
+\scriptsize
+% \textbf{Elementary identity: P(A,B) = P(A$\mid$B) P(B)}
+% \[
+% P(x_{0:N}) = P(x_{0:N-1} | x_N) P(x_N).
+% \]
+
+% \textbf{Reference bridge decomposition.}
+% \[
+% Q^{\text{ref}}(x_{0:N}) \;=\; Q^{\text{ref}}(x_{0:N-1}\mid x_N)\; p_N^{\text{ref}}(x_N),
+% \qquad p_N^{\text{ref}}(x_N)=\!\int Q^{\text{ref}}(x_{0:N})\,dx_{0:N-1}.
+% \]
+
+\textbf{Target path measure via terminal reweighting.}
 \[
-P(x_{0:T}) \ \propto\ Q^{\text{ref}}(x_{0:T})\ \frac{\mu(x_T)}{p^{\text{ref}}_T(x_T)}.
+P(x_{0:N}) \;\propto\; Q^{\text{ref}}(x_{0:N})\,\frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)}
+\qquad\Longrightarrow\qquad P(x_N)\propto\mu(x_N).
 \]
 
-\textbf{Key property (endpoint correctness).}
-By construction, the terminal marginal of $P$ satisfies
+\textbf{KL decomposition.}
 \[
-P(x_T) \ \propto\ \mu(x_T)\quad \Longrightarrow \quad P(x_T) = \pi(x_T)\ \text{up to the (unknown) normalizer } Z.
+\mathrm{KL}(Q\|P)
+=\mathbb E_{Q}\!\left[\log\frac{Q}{Q^{\text{ref}}}\right]
++\mathbb E_{Q}\!\left[\log\frac{p^{\text{ref}}_N(x_N)}{\pi(x_N)}\right].
 \]
-
-\textbf{Takeaway.} We have a principled path-space target $P$ whose endpoint is exactly the desired distribution, without ever using $Z$ along the way.
-\end{frame}
-
-% --- Slide 3 ---
-\begin{frame}[t]{Step 4: Path--KL equals an SOC objective}
-\footnotesize
-\textbf{Match the target on path space} by minimizing a KL divergence:
-\[
-\min_{f}\ D_{\mathrm{KL}}\!\big(Q\ \|\ P\big).
-\]
-
-\textbf{KL--control identity (Girsanov + chain rule).}
-Under standard regularity,
-\[
-\boxed{\
-D_{\mathrm{KL}}(Q\|P)
-=\ \mathbb E_{Q}\!\Big[\int_0^T \tfrac{1}{2\sigma^2}\|f(x_t,t)\|^2\,dt
-\ +\ \log\tfrac{p^{\text{ref}}_T(x_T)}{\mu(x_T)}\Big]\ +\ \text{const}
-}
-\]
-
-\textbf{Interpretation (SOC).}
-\begin{itemize}\itemsep2pt
-  \item \emph{Running cost:} $\tfrac{1}{2\sigma^2}\|f\|^2$ (control effort).
-  \item \emph{Terminal cost:} $\log p^{\text{ref}}_T(x_T)-\log\mu(x_T)$ (rewards high-$\mu$ endpoints).
-  \item The additive constant absorbs $+\log Z$ $\Rightarrow$ \textbf{$Z$ cancels}.
-\end{itemize}
-
-\textbf{Therefore:} Minimizing $D_{\mathrm{KL}}(Q\|P)$ is \emph{equivalent} to solving a stochastic optimal control problem.
-\end{frame}
-
-% --- Slide 4 ---
-\begin{frame}[t]{Step 5 \& intuition: why this works, what remains hard}
-\footnotesize
-\textbf{Continuous-time view (optional).}
-With $T$ fixed and finer discretization, the discrete sum becomes
-\[
-\min_f\ \mathbb E_Q\!\Big[\int_0^T \tfrac{1}{2\sigma^2}\|f(x_t,t)\|^2\,dt\ +\ \log\tfrac{p^{\text{ref}}_T(x_T)}{\mu(x_T)}\Big],
-\]
-the classic entropy-regularized SOC form.
-
 \medskip
-\textbf{Intuition (why it works).}
-\begin{itemize}\itemsep2pt
-  \item We \emph{steer} a simple diffusion toward regions where $\mu$ is large, trading control effort vs.\ terminal reward.
-  \item The endpoint of the ideal optimizer matches $\pi=\mu/Z$ (calibrated sampling), while never needing $Z$ explicitly.
-  \item Training only requires evaluating $\mu(x_T)$ (and optionally $\nabla\log\mu$), not intermediate-time scores.
-\end{itemize}
+\textbf{Running control cost (Gaussian mean-shift) Girsanov theorem.}
+\[
+\mathbb E_{Q}\!\left[\log\frac{Q}{Q^{\text{ref}}}\right]
+=\mathbb E_Q \sum_{n=0}^{N-1}\frac{h}{2\sigma^2}\,\|f(x_n,n)\|^2.
+\]
 
-\textbf{What remains hard (motivation for DGFS).}
-\begin{itemize}\itemsep2pt
-  \item The loss provides signal \emph{only at terminal time} $\Rightarrow$ poor credit assignment, high-variance gradients.
-\end{itemize}
+\textbf{Terminal potential from the target Girsanov theorem.}
+\[
+\mathbb E_{Q}\!\left[\log\frac{p^{\text{ref}}_N(x_N)}{\pi(x_N)}\right]
+=\mathbb E_Q\!\big[\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\big]\;+\;\log Z.
+\]
+
+\end{frame}
+
+\begin{frame}[t]{SOC objective}
+\footnotesize
+\medskip
+\textbf{SOC objective (discrete-time).}
+\[
+\boxed{\ \min_{f}\ \mathbb E_Q\!\Big[\sum_{n=0}^{N-1}\tfrac{h}{2\sigma^2}\|f(x_n,n)\|^2\;+\;\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\Big]\ }
+\]
 \end{frame}
 
 
@@ -283,10 +273,6 @@ s_\theta(x,t)\;=\;\tfrac{f_{\text{ref}}(x,t)-u_\theta(x,t)}{\sigma^2}.
 \textbf{Notation tip.} Use $u_\theta$ (or $f$) for the vector field to avoid clashing with $\mu(\cdot)$, which denotes the unnormalized density.
 \end{frame}
 
-% \begin{frame}{Diffusion Sampler}
-
-% \end{frame}
-
 
 \begin{frame}[t]{Sampling as a Stochastic Optimal Control problem}
 \footnotesize
@@ -321,28 +307,6 @@ with \(\Psi(x_N)=\dfrac{p_N^{\text{ref}}(x_N)}{\mu(x_N)}\).
 (Continuous-time limit recovers the classic VE-SDE SOC formulation.)
 \end{frame}
 
-\begin{frame}[t]{Why SOC, and what still hurts (motivation for DGFS)}
-\footnotesize
-\textbf{Why SOC/control-as-inference?}
-\begin{itemize}\itemsep3pt
-  \item Principled \emph{path-space} objective; $Z$ cancels, so only $\mu$ (and optionally $\nabla\log\mu$) is needed.
-  \item Calibrated sampling by \emph{steering} a simple reference process toward the target.
-\end{itemize}
-
-\textbf{Pain point in prior SOC samplers (PIS/DDS).}
-\begin{itemize}\itemsep3pt
-  \item Training signal sits \emph{only at terminal time} $N$ and losses use \emph{full trajectories} $\Rightarrow$ poor credit assignment, high variance, weaker mode coverage.
-\end{itemize}
-
-\textbf{DGFS in one line.}
-\begin{itemize}\itemsep3pt
-  \item Keep the same SOC/path-KL setup, but introduce a learned \emph{flow function} $F_n(x_n)$ and enforce \emph{subtrajectory balance} to inject \emph{intermediate} learning signals and enable \emph{partial-trajectory} training.
-\end{itemize}
-\end{frame}
-
-
-
-\subsection{Limitations of Prior Work}
 
 
 
