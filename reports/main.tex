@@ -312,9 +312,9 @@ we will be using this discrete-time objective as our loss function to optimize t
 
 
 %------------------------------------------------
-\section{Diffusion Generative Flow Samplers}
+\section{Stochastic Optimal Control to GFlowNets}
 
-\subsection{Motivation: Credit Assignment in Path Space}
+\subsection{Stochastic Optimal Control}
 
 \begin{frame}[t]{Credit Assignment Problem in Path Space}
 \footnotesize
@@ -358,6 +358,7 @@ we will be using this discrete-time objective as our loss function to optimize t
 \midrule
 \textbf{Forward Process} & Trajectory sampling on DAG & Controlled diffusion path \\
 \textbf{Forward Transition Probability} & $P_F(s' | s)$ & $P_F(x_{n+1} | x_n) = \mathcal{N}(x_{n+1}; x_n + h f(x_n), h\sigma^2 I)$ \\
+\textbf{Backward Transition Probability} & $P_B(s | s')$ & $P_B^{\text{ref}}(x_n | x_{n+1})$ (known) \\
 \textbf{Reward Function} & $R(x)$ (unnormalized) & $\mu(x)$ (unnormalized density) \\
 \textbf{Terminal Marginal Distribution} & $P_T(x) \propto R(x)$ & $Q(x_N) \propto \mu(x_N)$ \\
 \textbf{Flow State} & Flow $F(s)$ at states & Learned flow $F_n(x)$ \\
@@ -394,6 +395,9 @@ we will be using this discrete-time objective as our loss function to optimize t
 
 % Unfortunately, although we know the form of $P_B(\cdot|\cdot)$, for general target distribution there is generally no known analytical expression for it. As a result, we propose to use a deep neural network $F_n(\cdot; \theta)$ with parameter $\theta$ as a “helper” to approximate the unnormalized density of the $n$-th step target $p_n(\cdot)$.
 % \end{frame}
+
+
+\subsection{GFlowNet}
 
 \begin{frame}[t]{Decomposition of the Target Process}
 \footnotesize
@@ -514,7 +518,48 @@ F_n(x_n; \theta) P_F(x_{n+1} | x_n; \theta) = F_{n+1}(x_{n+1}; \theta) P_B(x_n |
 \end{itemize}
 
 \textbf{Overall Decision.} The method learns two neural networks: the flow $F(\cdot, n; \theta)$ and the forward policy $P_F$. This setup enables efficient, stable training with intermediate supervision.
+\end{frame}
 
+\begin{frame}[t]{Subtrajectory Balance (SubTB) Loss}
+\footnotesize
+
+\textbf{SubTB Loss for Partial Trajectories.}
+\[
+\ell_{\text{SubTB}}(x_{m:n}; \theta) = \left( \log \frac{F_m(x_m; \theta) \prod_{l=m}^{n-1} P_F(x_{l+1} | x_l; \theta)}{F_n(x_n; \theta) \prod_{l=m}^{n-1} P_B(x_l | x_{l+1})} \right)^2
+\]
+
+\textbf{Explanation of Parameters and Variables.}
+\begin{itemize}\itemsep2pt
+  \item $\theta$: Parameters of the neural networks (for $F_n$ and $P_F$).
+  \item $x_{m:n}$: Subtrajectory from step $m$ to $n$ (partial path $x_m, \dots, x_n$).
+  \item $F_m(x_m; \theta)$: Learned flow function approximating the marginal density at step $m$.
+  \item $P_F(x_{l+1} | x_l; \theta)$: Learned forward transition probability (includes the drift $f$).
+  \item $P_B(x_l | x_{l+1})$: Fixed backward transition probability (reference, known).
+  \item The loss enforces balance for subtrajectories, providing intermediate signals without full trajectories.
+\end{itemize}
+
+\textbf{Where is $f$ (Learned Drift)?} $f$ appears in $P_F$, as $P_F(x_{n+1} | x_n; \theta) = \mathcal{N}(x_{n+1}; x_n + h f(x_n, n), h\sigma^2 I)$, where $f$ is parameterized by neural networks.
+
+\end{frame}
+
+\begin{frame}[t]{Overall Training Objective}
+\scriptsize
+
+\textbf{Overall Loss for a Full Trajectory.}
+\[
+L(\tau; \theta) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\text{SubTB}}(x_{m:n})}{\sum_{0 \leq m < n \leq N} \lambda^{n-m}}, \quad \tau = (x_0, \dots, x_N)
+\]
+
+\textbf{Explanation of Parameters and Variables.}
+\begin{itemize}\itemsep2pt
+  \item $\tau$: Full trajectory $(x_0, \dots, x_N)$.
+  \item $\lambda$: Positive scalar weighting different subtrajectory lengths (e.g., shorter subtrajectories get higher weight if $\lambda < 1$).
+  \item The numerator sums SubTB losses over all subtrajectories $x_{m:n}$, weighted by $\lambda^{n-m}$ (length-based weighting).
+  \item The denominator normalizes to average the losses.
+  \item This combines signals from all subtrajectory lengths, reducing variance and improving credit assignment.
+\end{itemize}
+
+\textbf{Where is $f$ (Learned Drift)?} $f$ is embedded in $P_F$ within each $\ell_{\text{SubTB}}$. The loss optimizes $\theta$, which includes parameters for $f$ (via NN1 and NN2: $f(\cdot, n)/\sigma = \text{NN1}(\cdot, n) + \text{NN2}(n) \cdot \nabla \log \mu(\cdot)$), steering the forward process toward the target.
 \end{frame}
 
 \begin{frame}[t]{DGFS algorithm}
@@ -526,31 +571,89 @@ F_n(x_n; \theta) P_F(x_{n+1} | x_n; \theta) = F_{n+1}(x_{n+1}; \theta) P_B(x_n |
 
 \end{frame}
 
-% \begin{frame}[t]{Intermediate Learning Signals}
-
-% \footnotesize
-% \textbf{Key Idea.} Instead of waiting for the final signal, DGFS uses \emph{subtrajectory balance (SubTB)} to provide intermediate learning signals by optimizing over partial trajectories.
-
-% \begin{block}{Detailed Balance (DB) Loss in GFlowNets}
-% \[
-% \ell_{\text{DB}}(s, s'; \theta) = \left( \log \frac{F(s; \theta) P_F(s'|s; \theta)}{F(s'; \theta) P_B(s|s'; \theta)} \right)^2
-% \]
-% According to the theory of GFlowNets (Bengio et al., 2023), if the DB loss reaches 0 for any transition pair, then the forward policy samples correctly from the target distribution defined by R(·).
-
-% \end{block}
-
-% \begin{itemize}
-%     \item s and s' are two states in the trajectory (e.g., $x_n$ and $x_{n+1}$).
-%     \item F(s; $\theta$) is the learned flow function at state s, $P_F(s'|s; \theta)$ is the forward transition probability from s to s', and $P_B(s|s'; \theta)$ is the backward transition probability from s' to s.
-% \end{itemize}
-
-% \end{frame}
-
 
 %------------------------------------------------
-\section{Results and Limitations}
+\section{Diffusion Generative Flow Sampler Results}
 
-\subsection{Results}
+\subsection{Gradients Variance Reduction and $Z$ estimation}
+
+\begin{frame}[t]{Reduction of gradient variance}
+\footnotesize
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.4\textwidth]{figures/grad_variance.png}
+    \caption{Gradient variance comparison between DGFS and PIS. DGFS shows significantly lower variance, leading to more stable training.}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}[t]{Accurate partition function $Z$ estimation}
+\footnotesize
+
+\textbf{Estimation of the partition function.} For an arbitrary trajectory $\tau = \{x_n\}_{n=0}^N$, one could define its (log) importance weight to be $S(\tau; \theta) = \log P(x_{0:N}) - \log Q(x_{0:N}; \theta)$, where $Q(x_{0:N}; \theta) = p^{\text{ref}}_0(x_0) \prod_{n=0}^{N-1} P_F(x_{n+1}|x_n; \theta)$.
+
+\textbf{Log-partition function (log Z) estimator:}
+\[
+\log \sum_{b=1}^B \exp(S(\tau^{(b)}; \theta)) - \log B \leq \log Z, \quad \tau^{(b)} \sim Q(\cdot; \theta).
+\]
+
+\textbf{Explanation.}
+\begin{itemize}\itemsep2pt
+  \item $S(\tau; \theta)$: The log importance weight, measuring how much more likely the trajectory is under the target $P$ (which has terminal marginal $\pi \propto \mu$) than under the learned $Q$.
+  \item $Q(x_{0:N}; \theta)$: The learned path measure, with terminal marginal approximating $\pi$.
+  \item The estimator uses importance sampling: Sample trajectories from $Q$, compute their weights, and average in log space to estimate $\log Z$.
+  \item The inequality $\leq \log Z$ holds because $Q$ approximates $P$, providing a lower bound on $\log Z$.
+  \item This gives an accurate estimate of $Z$ without needing samples from $\pi$, leveraging the learned model.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[t]{Partition function estimation results}
+\footnotesize
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1.025\textwidth]{figures/partition_fnct.png}
+    \caption{To write a caption}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}[t]{Mode coverage results}
+
+\begin{columns}[t]
+\begin{column}{0.48\textwidth}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/mode.png}
+    \caption{Manywell plots. DGFS and DDS but not PIS recover all modes}
+\end{figure}
+\end{column}
+\begin{column}{0.48\textwidth}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/MoG.png}
+    \caption{MoG visualization of DGFS and other diffusion-based samplers shows that DGFS could capture the diverse modes well. The contours display the landscape of the target density}
+\end{figure}
+\end{column}
+\end{columns}
+    
+\end{frame}
+
+\subsection{Convergence Guarantees}
+
+\begin{frame}[t]{Convergence Theorem}
+\footnotesize
+
+\textbf{Convergence Guarantees for DGFS.}
+\begin{itemize}\itemsep2pt
+  \item Previous studies (Bortoli, 2022; Chen et al., 2022; Lee et al., 2022) show that the terminal sample distribution of a diffusion model converges to the target under mild assumptions if the control term is well learned. These apply to DGFS since proofs are independent of training method.
+  \item Zhang et al. (2022a) prove that a perfectly learned score corresponds to zero GFlowNet training loss (Bengio et al., 2021; 2023), ensuring a well-trained DGFS accurately samples from the target distribution.
+\end{itemize}
+
+\end{frame}
+
 
 
 %------------------------------------------------
@@ -563,6 +666,9 @@ F_n(x_n; \theta) P_F(x_{n+1} | x_n; \theta) = F_{n+1}(x_{n+1}; \theta) P_B(x_n |
 % Add content: Discuss limitations, extensions, and personal thoughts.
 
 \begin{frame}{Conclusion}
+\footnotesize
+
+\textbf{Summary of DGFS.} We propose the Diffusion Generative Flow Sampler (DGFS), a novel algorithm that trains diffusion models to sample from given unnormalized target densities. Different from prior works that could only learn from complete diffusion chains, DGFS can update its parameters with only partial specification of the stochastic process trajectory; moreover, DGFS can receive intermediate signals before completing the entire path. These features help DGFS benefit from efficient credit assignment and thus achieve better partition function estimation bias in the sampling benchmarks.
 
 \end{frame}
 
