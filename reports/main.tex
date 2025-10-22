@@ -72,7 +72,7 @@
 \begin{frame}[t]{Generative Modeling}
 \scriptsize
 \begin{block}{Task}
-    Sample from a complex (high-dimensional and multimodal) distribution $D$
+    Sample from a complex (high-dimensional and multimodal) distribution $D$.
 \end{block}
 
 $D$ can be given under the form of:
@@ -103,7 +103,7 @@ $D$ can be given under the form of:
 
 \begin{frame}[t]{Sampling from Unnormalized Densities}
 \footnotesize
-\textbf{Goal.} Sample from a $D$-dimensional target with unnormalized density $\mu(x)$ where $\mathbb R^D \to \mathbb R^+$.
+\textbf{Context.} Sample from a $D$-dimensional target with unnormalized density $\mu(x)$ where $\mathbb R^D \to \mathbb R^+$.
 \[
 \pi(x)=\frac{\mu(x)}{Z},\qquad Z=\int_{\mathbb R^D}\mu(x)\,dx\ \text{(unknown)}.
 \]
@@ -112,17 +112,18 @@ We assume we can evaluate $\mu(x)$, but we have no samples from $\pi$ and do not
 \vspace{0.1cm}
 
 \medskip
-\textbf{Context.} We seek a \emph{sampler} (similar to MCMC/VI) that produces calibrated samples and, ideally, estimates of $\log Z$, \emph{without} any dataset from $\pi$.
+\textbf{Goal.} We seek a \emph{sampler} (similar to MCMC/VI) that produces calibrated samples and, ideally, estimates $Z$ \emph{without} any dataset from $\pi$.
 
 \vspace{0.3cm}
 
+\begin{block}{\scriptsize Chemistry (molecule conformers).} \scriptsize Different 3D conformations have a formation energy from force-field terms (bonds, angles, dihedrals, nonbonded). A low energy means a higher probability of being sampled. A well-calibrated sampler is needed to draw conformers in proportion to these probabilities, which is important in binding-pose ranking, free-energy estimation and generating diverse realistic 3D conformers for screening.
+\end{block}
 
-\textbf{Chemistry (small-molecule conformers).} Different 3D conformations have a formation energy from force-field terms (bonds, angles, dihedrals, nonbonded); lower energy $\Rightarrow$ higher Boltzmann probability. A well-calibrated sampler is needed to draw conformers in proportion to these probabilities, which is important in binding-pose ranking/free-energy estimation, Boltzmann-weighted property prediction (e.g., NMR shifts), and generating diverse realistic 3D conformers for screening.
 \end{frame}
 
 \begin{frame}[t]{Diffusion Generative Flow Samplers}
 \footnotesize
-\textbf{Idea.} We will \emph{reframe sampling} from an unnormalized target $\pi(x)\propto \mu(x)$ as a \emph{stochastic optimal control (SOC)} problem: learn a control that steers a simple reference diffusion so its \emph{terminal marginal} matches $\pi$.
+\textbf{Idea.} We will \emph{reframe sampling} from an unnormalized target $\pi(x)\propto \mu(x)$ as a \emph{stochastic optimal control (SOC)} problem. This means learning a control function that steers a diffusion process so its \emph{terminal marginal} matches $\pi$.
 
 \medskip
 \textbf{Why this helps.}
@@ -138,6 +139,18 @@ We assume we can evaluate $\mu(x)$, but we have no samples from $\pi$ and do not
 \medskip
 \textbf{DGFS fix (preview).} Inject \emph{intermediate} learning signals via a GFlowNet-inspired \emph{learned flow} and \emph{subtrajectory balance}, enabling partial-trajectory training and more stable learning.
 \end{frame}
+
+\begin{frame}[t]{Diffusion Generative Flow Samplers v2}
+
+    Minimizing the running and terminal costs between the optimal controlled process and the uncontrolled reference process.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.6\textwidth]{figures/image.png}
+\end{figure}
+
+\end{frame}
+
 
 \subsection{Stochastic Optimal Control}
 
@@ -168,24 +181,24 @@ Q^{\text{ref}}(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F^{\text{
 \textbf{Goal.} Learn $f$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown).
 \end{frame}
 
-\begin{frame}[t]{Target Path Measure via Importance Sampling}
-\footnotesize
+% \begin{frame}[t]{Target Path Measure via Importance Sampling}
+% \footnotesize
 
-\textbf{Importance Sampling Basics.} Importance sampling is a technique to estimate expectations under a hard-to-sample target distribution \( P \) using samples from an easy-to-sample proposal distribution \( Q \). The key formula is:
-\[
-\mathbb{E}_{x \sim Q} \left[ f(x) \cdot w(x) \right] = \mathbb{E}_{x \sim P} [f(x)],
-\]
-where the \textcolor{red}{\emph{importance weight} \( w(x) = \frac{P(x)}{Q(x)} \)} corrects the samples from \( Q \) to behave as if they were from \( P \).
+% \textbf{Importance Sampling Basics.} Importance sampling is a technique to estimate expectations under a hard-to-sample target distribution \( P \) using samples from an easy-to-sample proposal distribution \( Q \). The key formula is:
+% \[
+% \mathbb{E}_{x \sim Q} \left[ f(x) \cdot w(x) \right] = \mathbb{E}_{x \sim P} [f(x)],
+% \]
+% where the \textcolor{red}{\emph{importance weight} \( w(x) = \frac{P(x)}{Q(x)} \)} corrects the samples from \( Q \) to behave as if they were from \( P \).
 
-\textbf{Intuition.} \( Q \) provides "biased" samples; \( w(x) \) upweights samples that are likely under \( P \) and downweights those that aren't, effectively resampling from \( P \) without directly sampling it.
+% \textbf{Intuition.} \( Q \) provides "biased" samples; \( w(x) \) upweights samples that are likely under \( P \) and downweights those that aren't, effectively resampling from \( P \) without directly sampling it.
 
-\textbf{Application to Path Measures.} In our case, the "samples" are entire trajectories \( x_{0:N} \), and we want the path measure \( P \) to have the correct terminal marginal \( \pi(x_N) \propto \mu(x_N) \). We use the reference path measure \( Q^{\text{ref}} \) (easy to sample, e.g., Gaussian paths) as the proposal. The reweighted path measure is:
-\[
-P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \cdot w(x_{0:N}),
-\]
-where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This ensures \( P(x_N) \propto \mu(x_N) \), as the weight depends only on the endpoint.
+% \textbf{Application to Path Measures.} In our case, the "samples" are entire trajectories \( x_{0:N} \), and we want the path measure \( P \) to have the correct terminal marginal \( \pi(x_N) \propto \mu(x_N) \). We use the reference path measure \( Q^{\text{ref}} \) (easy to sample, e.g., Gaussian paths) as the proposal. The reweighted path measure is:
+% \[
+% P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \cdot w(x_{0:N}),
+% \]
+% where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This ensures \( P(x_N) \propto \mu(x_N) \), as the weight depends only on the endpoint.
 
-\end{frame}
+% \end{frame}
 
 % \begin{frame}[t]{Target Path Measure via IS (Part 2)}
 % \footnotesize
@@ -219,16 +232,19 @@ where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This
 
 \textbf{Target path measure via terminal reweighting.}
 \[
-P(x_{0:N}) \;\propto\; Q^{\text{ref}}(x_{0:N})\,\frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)}
+P(x_{0:N}) \;\propto\; Q^{\text{ref}}(x_{0:N-1} | x_N) \mu(x_N) \;\propto\ Q^{\text{ref}}(x_{0:N})\,\frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)}
 \qquad\Longrightarrow\qquad P(x_N)\propto\mu(x_N).
 \]
 
 \textbf{KL decomposition.}
 \[
 \mathrm{KL}(Q\|P)
+=\mathbb E_{Q}\!\left[\log\frac{Q}{P}\right]
 =\mathbb E_{Q}\!\left[\log\frac{Q}{Q^{\text{ref}}}\right]
-+\mathbb E_{Q}\!\left[\log\frac{p^{\text{ref}}_N(x_N)}{\pi(x_N)}\right].
++\mathbb E_{Q}\!\left[\log\frac{p^{\text{ref}}_N(x_N)}{\mu(x_N)}\right] + \log Z.
 \]
+
+
 \medskip
 \textbf{Running control cost (Gaussian mean-shift) Girsanov theorem.}
 \[
@@ -238,8 +254,8 @@ P(x_{0:N}) \;\propto\; Q^{\text{ref}}(x_{0:N})\,\frac{\mu(x_N)}{p^{\text{ref}}_N
 
 \textbf{Terminal potential from the target Girsanov theorem.}
 \[
-\mathbb E_{Q}\!\left[\log\frac{p^{\text{ref}}_N(x_N)}{\pi(x_N)}\right]
-=\mathbb E_Q\!\big[\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\big]\;+\;\log Z.
+\mathbb E_{Q}\!\left[\log\frac{p^{\text{ref}}_N(x_N)}{\mu(x_N)}\right]
+=\mathbb E_Q\!\big[\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\big]
 \]
 
 \end{frame}
@@ -664,18 +680,15 @@ L(\tau; \theta) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\text{Sub
 %------------------------------------------------
 \section{Conclusion}
 
-\subsection{Key Insights}
-% Add content: Summarize DGFS's impact and paper's contributions.
-
-\subsection{Future Directions and Usage since its release}
-% Add content: Discuss limitations, extensions, and personal thoughts.
-
+\subsection{Summary}
 \begin{frame}{Conclusion}
 \footnotesize
 
 \textbf{Summary of DGFS.} We propose the Diffusion Generative Flow Sampler (DGFS), a novel algorithm that trains diffusion models to sample from given unnormalized target densities. Different from prior works that could only learn from complete diffusion chains, DGFS can update its parameters with only partial specification of the stochastic process trajectory; moreover, DGFS can receive intermediate signals before completing the entire path. These features help DGFS benefit from efficient credit assignment and thus achieve better partition function estimation bias in the sampling benchmarks.
 
 \end{frame}
+
+\subsection{Limitations and Future Work}
 
 
 \end{document}
