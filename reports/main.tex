@@ -26,6 +26,9 @@
 \usepackage{graphicx} % Allows including images
 \usepackage{booktabs} % Allows the use of \toprule, \midrule and \bottomrule in tables
 \usepackage{array} % Allows >{\centering\arraybackslash} in tabular
+\usepackage[utf8]{inputenc} % Handle Unicode characters
+\usepackage[T1]{fontenc} % Better font encoding
+\usepackage{amsmath,amssymb} % Math symbols
 
 % Define hyphenation command
 \newcommand{\hyp}{-}
@@ -149,36 +152,47 @@ We assume we can evaluate $\mu(x)$, but we have no samples from $\pi$ and do not
     \includegraphics[width=0.6\textwidth]{figures/image.png}
 \end{figure}
 
+\note{refaire cette illustration avec le controlled, uncontrolled et target (optimal controlled) processus }
+
 \end{frame}
 
 
 \subsection{Stochastic Optimal Control}
 
-% --- Slide 1 ---
-\begin{frame}[t]{Steps 1--2: Forward \& Reference in \textit{discrete time}}
-\footnotesize
+\begin{frame}[t]{Controlled and Reference Processes}
+\scriptsize
 \textbf{Controlled forward transition (learned drift).}
 \[
-P_F(x_{n+1}\mid x_n)\;=\;\mathcal N\!\big(x_{n+1};\;x_n + h\,f(x_n,n),\;h\sigma^2 I\big)
+P_F(x_{n+1}\mid x_n)\;=\;\mathcal N\!\big(x_{n+1};\;x_n + h\,f_\theta(x_n,n),\;h\sigma^2 I\big)
 \]
-\textbf{Controlled path law.}
+\textbf{Controlled process.}
 \[
 Q(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F(x_{n+1}\mid x_n)
 \]
 
 \medskip
-\textbf{Uncontrolled (reference) transition (zero drift).}
+\textbf{Uncontrolled/Reference forward transition (zero drift).}
 \[
 P_F^{\text{ref}}(x_{n+1}\mid x_n)\;=\;\mathcal N\!\big(x_{n+1};\;x_n,\;h\sigma^2 I\big)
 \]
-\textbf{Reference path law and marginals.}
+\textbf{Uncontrolled/Reference process and marginals.}
 \[
 Q^{\text{ref}}(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F^{\text{ref}}(x_{n+1}\mid x_n),
-\qquad p^{\text{ref}}_n(x)\;\text{is closed form.}
+\]
+
+\[
+p^{\text{ref}}_n(x) = \mathcal{N}\left( x; \mu_0, \Sigma_0 + n h \sigma^2 I \right), \;\text{is closed form.}
 \]
 
 \medskip
-\textbf{Goal.} Learn $f$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown).
+\textbf{Goal.} Learn $f$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown.).
+
+\note{Why closed form for uncontrolled but not controlled? The uncontrolled reference process has no drift, so each transition is a simple Gaussian convolution, leading to Gaussian marginals with closed-form means and variances $(e.g., p^{ref}_n(x) = N(x; mu_0, cov_0 + n h \sigma^2 I))$. The controlled process includes a learned drift $f(x_n, n)$, which makes transitions non-Gaussian and dependent on $f$, preventing a closed-form marginal expression without solving the integral numerically or via simulation.
+
+
+\textcolor{red}{je dois refaire cette slide, on ne voit meme comment xn est sample (par rapport a la SDE) et aussi d'ou sort sigma mu et la closed form expliquer et c'est une convolution de gaussienne}
+}
+
 \end{frame}
 
 % \begin{frame}[t]{Target Path Measure via Importance Sampling}
@@ -217,7 +231,7 @@ Q^{\text{ref}}(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F^{\text{
 % \end{frame}
 
 % --- Slide 2 ---
-\begin{frame}[t]{Step 3: Path target \& KL $\Rightarrow$ SOC objective}
+\begin{frame}[t]{Path space KL objective}
 \scriptsize
 % \textbf{Elementary identity: P(A,B) = P(A$\mid$B) P(B)}
 % \[
@@ -249,26 +263,14 @@ P(x_{0:N}) \;\propto\; Q^{\text{ref}}(x_{0:N-1} | x_N) \mu(x_N) \;\propto\ Q^{\t
 \textbf{Running control cost (Gaussian mean-shift) Girsanov theorem.}
 \[
 \mathbb E_{Q}\!\left[\log\frac{Q}{Q^{\text{ref}}}\right]
-=\mathbb E_Q \sum_{n=0}^{N-1}\frac{h}{2\sigma^2}\,\|f(x_n,n)\|^2.
+=\mathbb E_Q \sum_{n=0}^{N-1}\frac{h}{2\sigma^2}\,\|f_\theta(x_n,n)\|^2.
 \]
 
-\textbf{Terminal potential from the target Girsanov theorem.}
+\textbf{Terminal cost.}
 \[
 \mathbb E_{Q}\!\left[\log\frac{p^{\text{ref}}_N(x_N)}{\mu(x_N)}\right]
 =\mathbb E_Q\!\big[\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\big]
 \]
-
-\end{frame}
-
-\begin{frame}[t]{SOC objective}
-\footnotesize
-\medskip
-\textbf{SOC objective (discrete-time).}
-\[
-\boxed{\ \min_{f}\ \mathbb E_Q\!\Big[\sum_{n=0}^{N-1}\tfrac{h}{2\sigma^2}\|f(x_n,n)\|^2\;+\;\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\Big]\ }
-\]
-
-we will be using this discrete-time objective as our loss function to optimize the drift $f$. Thus we can model the drift with a neural network $f_\theta$ and optimize the parameters $\theta$ backpropagating through time (BPTT) while avoiding to use the stochastic-adjoint method necessary for a neural SDE.
 \end{frame}
 
 %!Diffusion Denoising Score Matching slides removed for brevity 
@@ -332,33 +334,35 @@ we will be using this discrete-time objective as our loss function to optimize t
 
 \subsection{Stochastic Optimal Control}
 
-\begin{frame}[t]{Credit Assignment Problem in Path Space}
+\begin{frame}[t]{Credit Assignment Problem in SOC objective}
 \footnotesize
-\begin{errorblock}{Current Loss Function}
+\begin{errorblock}{SOC Discrete-time objective}
 \[
-\min_{f}\ \mathbb E_Q\!\Big[\sum_{n=0}^{N-1}\tfrac{h}{2\sigma^2}\|f(x_n,n)\|^2\;+\;\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\Big]
+\min_{f_\theta}\ \mathbb E_Q\!\Big[\underbrace{\sum_{n=0}^{N-1}\tfrac{h}{2\sigma^2}\|f_\theta(x_n,n)\|^2}_{\text{Running cost}}\;+\;\underbrace{\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)}_{\text{Terminal cost}}\Big]
 \]
+
+This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusion-based Sampling for Unnormalized Densities} by Dinghuai Zhang et al which presented the sampling from unnormalized densities as a stochastic optimal control problem.
+
 \end{errorblock}
 
-\textbf{Explanation.} Since we are guiding our trajectory using the terminal marginal distribution $p_N^{\text{ref}}$ and $\mu(x)$, the only signal we have is at the end. Thus, when we do the chain rule for backpropagation through time, it is very hard to know which decision at which time step got the right or wrong action (credit assignment problem).
-
-%running cost + terminal potential show optimal control base cost fucntion
-\end{frame}
-
-\begin{frame}{GFlowNet's perspective on DGFS}
-\footnotesize
-
-\textbf{Recap of GFlowNets.} GFlowNets learn to sample from unnormalized distributions by modeling flows on a DAG.
-
-\begin{itemize}\itemsep2pt
-  \item \textbf{DAG Structure:} Define a DAG $G = (S, A)$ with states $S$ and directed edges $s \to s' \in A$.
-  \item \textbf{Trajectories:} Complete trajectories $\tau = s_0 \to s_1 \to \dots \to s_T$ from start to terminal states.
-  \item \textbf{Forward Policy:} $P_F(s' | s)$, the probability of transitioning from $s$ to $s'$.
-  \item \textbf{Terminal Marginal:} $P_T(x) = \sum_{\tau \text{ ending at } x} P_F(\tau)$, the marginal over terminating states.
-  \item \textbf{Goal:} Learn $P_F$ such that $P_T(x) \propto R(x)$, where $R(x)$ is the unnormalized reward/density, and $Z = \sum_x R(x)$.
-\end{itemize}
+\textbf{Explanation.} The SOC objective provides feedback signal only at the terminal step, making credit assignment difficult via backpropagation through time. This causes high-variance gradients, weak feedback for early actions, poor mode discovery, and inefficient optimization of the drift $f$ without intermediate signals.
 
 \end{frame}
+
+% \begin{frame}{GFlowNet's perspective on DGFS}
+% \footnotesize
+
+% \textbf{Recap of GFlowNets.} GFlowNets learn to sample from unnormalized distributions by modeling flows on a DAG.
+
+% \begin{itemize}\itemsep2pt
+%   \item \textbf{DAG Structure:} Define a DAG $G = (S, A)$ with states $S$ and directed edges $s \to s' \in A$.
+%   \item \textbf{Trajectories:} Complete trajectories $\tau = s_0 \to s_1 \to \dots \to s_T$ from start to terminal states.
+%   \item \textbf{Forward Policy:} $P_F(s' | s)$, the probability of transitioning from $s$ to $s'$.
+%   \item \textbf{Terminal Marginal:} $P_T(x) = \sum_{\tau \text{ ending at } x} P_F(\tau)$, the marginal over terminating states.
+%   \item \textbf{Goal:} Learn $P_F$ such that $P_T(x) \propto R(x)$, where $R(x)$ is the unnormalized reward/density, and $Z = \sum_x R(x)$.
+% \end{itemize}
+
+% \end{frame}
 
 \begin{frame}[t]{SOC as a GFlowNet}
 \footnotesize
@@ -383,6 +387,8 @@ we will be using this discrete-time objective as our loss function to optimize t
 \end{table}
 
 \textbf{Insight.} Since SOC can be viewed as a GFlowNet, we can apply GFlowNet tools (e.g., detailed balance loss, subtrajectory balance) to solve the credit assignment problem in diffusion sampling.
+
+\note{make a mental note to comeback to professor hernandez comment on Tristan's Deleu presentation when someone asked: "The if GFlowNets are just Reinfrocement Learning, then why keep doing research on this framework?" Professor Hernandez reponded by proving the felxibility of GFN, he said that it was en entery point between RL, Diffusion models, Energy-based models and in this case we prove that it can also be used in Stochastic Optimal Control problems.}
 
 \end{frame}
 
