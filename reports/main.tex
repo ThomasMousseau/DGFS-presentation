@@ -340,7 +340,7 @@ where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This
 %------------------------------------------------
 \section{Stochastic Optimal Control to GFlowNets}
 
-\subsection{Stochastic Optimal Control}
+\subsection{Target Process}
 
 \begin{frame}[t]{Credit Assignment Problem in SOC objective}
 \footnotesize
@@ -636,27 +636,6 @@ with only full paths}
 \end{frame}
 
 
-\begin{frame}[t]{Mode coverage results}
-
-\begin{columns}[t]
-\begin{column}{0.48\textwidth}
-\begin{figure}
-    \centering
-    \includegraphics[width=0.5\textwidth]{figures/mode.png}
-    \caption{Manywell plots. DGFS and DDS but not PIS recover all modes}
-\end{figure}
-\end{column}
-\begin{column}{0.48\textwidth}
-\begin{figure}
-    \centering
-    \includegraphics[width=0.9\textwidth]{figures/MoG.png}
-    \caption{MoG visualization of DGFS and other diffusion-based samplers shows that DGFS could capture the diverse modes well. The contours display the landscape of the target density}
-\end{figure}
-\end{column}
-\end{columns}
-    
-\end{frame}
-
 \begin{frame}[t]{Accurate partition function $Z$ estimation}
 \footnotesize
 
@@ -687,11 +666,9 @@ with only full paths}
 
 \end{frame}
 
-
-
 \subsection{Convergence Guarantees}
 
-\begin{frame}[t]{Convergence Theorem}
+\begin{frame}[t]{Convergence Guarantees}
 \footnotesize
 
 \textbf{Convergence Guarantees for DGFS.}
@@ -700,10 +677,41 @@ with only full paths}
   \item \cite{zhang2022a} prove that a perfectly learned score corresponds to zero GFlowNet training loss \cite{bengio2021,bengio2023}, ensuring a well-trained DGFS accurately samples from the target distribution.
 \end{itemize}
 
+\note{Le but de montrer cette slide de garanties de convergences est pour prouver que malgrer les examples simples MoG, Manywell, etc (doivent etre simple pour avoir acces a la partition function Z, on peut garantir que DGFS va converger vers la bonne distribution cible pour des targets plus complexes.)}
+
 \end{frame}
 
-\begin{frame}[t]{Off-policy training capability}
-    \footnotesize
+\begin{frame}[t]{Mode coverage results}
+
+\begin{columns}[t]
+\begin{column}{0.48\textwidth}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/mode.png}
+    \caption{Manywell plots. DGFS and DDS but not PIS recover all modes}
+\end{figure}
+\end{column}
+\begin{column}{0.48\textwidth}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\textwidth]{figures/MoG.png}
+    \caption{MoG visualization of DGFS and other diffusion-based samplers shows that DGFS could capture the diverse modes well. The contours display the landscape of the target density}
+\end{figure}
+\end{column}
+\end{columns}
+    
+\end{frame}
+
+\begin{frame}[t]{Off-policy training capability (a voir si on garde cette slide)}
+\footnotesize
+
+\textbf{Off-Policy Training in DGFS.} Unlike previous KL-based methods restricted to on-policy training (high-variance off-policy via importance sampling), DGFS supports off-policy exploration without it, as its objectives (Eq. 9/14) don't require samples from a specific distribution \cite{malkin2023,lahlou2023}.
+
+\textbf{Exploration Strategy.} Use a larger variance coefficient \(\tilde{\sigma} > \sigma\) in the forward process during rollouts to capture diverse modes, improving multimodal sampling.
+
+\textbf{Example: MoG+ Task.} With distant modes, setting \(\tilde{\sigma} = 2\) (vs. \(\sigma = 1\)) achieves better mode coverage and lower Z estimation bias.
+
+\textbf{DGFS+ Experiment.} Linearly anneal \(\tilde{\sigma}\) from 1.1 to 1 over first 1000 steps, enhancing performance in some scenarios as a tunable hyperparameter.
 
 \end{frame}
 
@@ -716,7 +724,7 @@ with only full paths}
 \begin{frame}{Conclusion}
 \footnotesize
 
-\textbf{Summary of DGFS.} We propose the Diffusion Generative Flow Sampler (DGFS), a novel algorithm that trains diffusion models to sample from given unnormalized target densities. Different from prior works that could only learn from complete diffusion chains, DGFS can update its parameters with only partial specification of the stochastic process trajectory; moreover, DGFS can receive intermediate signals before completing the entire path. These features help DGFS benefit from efficient credit assignment and thus achieve better partition function estimation bias in the sampling benchmarks.
+\textbf{Summary.} Diffusion Generative Flow Sampler (DGFS), a novel algorithm that trains diffusion models to sample from given unnormalized target densities. Different from prior works (Path Integral Sampler and Denoising Diffusion Sampler) that could only learn from complete diffusion chains, DGFS can update its parameters with only partial specification of the stochastic process trajectory. These features help DGFS benefit from efficient credit assignment and thus achieve better partition function estimation bias in the sampling benchmarks while keeping the theoretical guarantees of convergence from diffusion-based samplers.
 
 \end{frame}
 
