@@ -13,3 +13,7 @@ reports/*.fls
 reports/*.fdb_latexmk
 reports/*.synctex.gz
 reports/*.snm
+*.bbl
+*.blg   
+*.bcf
+*.run.xml

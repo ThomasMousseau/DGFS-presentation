@@ -31,6 +31,8 @@
 \usepackage{amsmath,amssymb} % Math symbols
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage[backend=biber,style=authoryear,maxcitenames=1]{biblatex}
+\addbibresource{refs.bib}
 
 % Define hyphenation command
 \newcommand{\hyp}{-}
@@ -604,6 +606,7 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 \begin{frame}[t]{Reduction of gradient variance}
 \footnotesize
 
+\vspace{-0.75cm}
 \begin{columns}[t]
 \begin{column}{0.33\textwidth}
 \begin{figure}
@@ -616,14 +619,16 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 \begin{figure}
     \centering
     \includegraphics[width=\textwidth]{figures/drift.png}
-    \caption{Caption for drift.png}
+    \caption{Drift network magnitude of DGFS and PIS.}
 \end{figure}
 \end{column}
 \begin{column}{0.33\textwidth}
 \begin{figure}
     \centering
     \includegraphics[width=\textwidth]{figures/grad_variance_2.png}
-    \caption{Caption for }
+    \caption{Gradient variance of
+DGFS, PIS, and DGFS trained
+with only full paths}
 \end{figure}
 \end{column}
 \end{columns}
@@ -691,8 +696,8 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 
 \textbf{Convergence Guarantees for DGFS.}
 \begin{itemize}\itemsep2pt
-  \item Previous studies (Bortoli, 2022; Chen et al., 2022; Lee et al., 2022) show that the terminal sample distribution of a diffusion model converges to the target under mild assumptions if the control term is well learned. These apply to DGFS since proofs are independent of training method.
-  \item Zhang et al. (2022a) prove that a perfectly learned score corresponds to zero GFlowNet training loss (Bengio et al., 2021; 2023), ensuring a well-trained DGFS accurately samples from the target distribution.
+  \item Previous studies \cite{bortoli2022,chen2022,lee2022} show that the terminal sample distribution of a diffusion model converges to the target under mild assumptions if the control term is well learned. These apply to DGFS since proofs are independent of training method.
+  \item \cite{zhang2022a} prove that a perfectly learned score corresponds to zero GFlowNet training loss \cite{bengio2021,bengio2023}, ensuring a well-trained DGFS accurately samples from the target distribution.
 \end{itemize}
 
 \end{frame}
@@ -720,6 +725,11 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 \begin{frame}{Questions and hopefully answers :)}
     \centering
     \Huge Questions?
+\end{frame}
+
+\begin{frame}[allowframebreaks]{References}
+\footnotesize
+\printbibliography
 \end{frame}
 
 
