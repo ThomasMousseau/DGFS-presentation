@@ -29,6 +29,8 @@
 \usepackage[utf8]{inputenc} % Handle Unicode characters
 \usepackage[T1]{fontenc} % Better font encoding
 \usepackage{amsmath,amssymb} % Math symbols
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 
 % Define hyphenation command
 \newcommand{\hyp}{-}
@@ -508,19 +510,19 @@ F_n(x_n; \phi) \prod_{k=n}^{N-1} P_F(x_{k+1} | x_k; \theta) = \mu(x_N) \prod_{k=
 \begin{frame}[t]{Detailed Balance with Learned Flow}
 \footnotesize
 
-\textbf{Deriving SubTB.} Comparing the constraint for $n$ and $n+1$ gives a formula independent of $\mu$ which now only involves local transitions (signal subtrajectories instead of full trajectories)
+\textbf{Detailed Balance from Trajectory Balance condition.} Comparing the constraint for $n$ and $n+1$ gives a formula independent of $\mu$ which now only involves local transitions (signal subtrajectories instead of full trajectories)
 \[
 F_n(x_n; \theta) P_F(x_{n+1} | x_n; \theta) = F_{n+1}(x_{n+1}; \theta) P_B(x_n | x_{n+1}).
 \]
 
 \end{frame}
 
-\begin{frame}[t]{Detailed Balance Loss for Subtrajectories}
+\begin{frame}[t]{Subtrajectories Loss}
 \footnotesize
 
-\textbf{Detailed Balance Loss for Partial Trajectories.}
+\textbf{Subtrajectory Balance Loss for Partial Trajectories.}
 \[
-\ell_{\text{DB}}(x_{m:n}; \theta, \phi) = \left( \log \frac{F_m(x_m; \phi) \prod_{k=m}^{n-1} P_F(x_{k+1} | x_k; \theta)}{F_n(x_n; \phi) \prod_{k=m}^{n-1} P_B(x_k | x_{k+1})} \right)^2
+\ell_{\text{SubTB}}(x_{m:n}; \theta, \phi) = \left( \log \frac{F_m(x_m; \phi) \prod_{k=m}^{n-1} P_F(x_{k+1} | x_k; \theta)}{F_n(x_n; \phi) \prod_{k=m}^{n-1} P_B(x_k | x_{k+1})} \right)^2
 \]
 
 \textbf{Forward Process (Controlled).} The learned forward transition depends on \(\theta\):
@@ -536,30 +538,61 @@ where \(f(x_n, n)\) is the learned drift parameterized by \(\theta\).
 \begin{frame}[t]{Overall Training Objective}
 \scriptsize
 
-\textbf{Overall Loss for a Full Trajectory.}
+\vspace{-0.25cm}
+
+\begin{block}{\scriptsize Recall SubTB Loss}
+\scriptsize
 \[
-L(\tau; \theta) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\text{SubTB}}(x_{m:n})}{\sum_{0 \leq m < n \leq N} \lambda^{n-m}}, \quad \tau = (x_0, \dots, x_N)
+\ell_{\text{SubTB}}(x_{m:n}; \theta, \phi) = \left( \log \frac{F_m(x_m; \phi) \prod_{k=m}^{n-1} P_F(x_{k+1} | x_k; \theta)}{F_n(x_n; \phi) \prod_{k=m}^{n-1} P_B(x_k | x_{k+1})} \right)^2
+\]
+\end{block}
+
+\begin{errorblock}{\scriptsize Diffusion Generative Flow Sampler (DGFS) Loss}
+    \scriptsize
+\[
+L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\text{SubTB}}(x_{m:n})}{\sum_{0 \leq m < n \leq N} \lambda^{n-m}}, \quad \tau = (x_0, \dots, x_N)
 \]
 
-\textbf{Explanation of Parameters and Variables.}
+\textbf{This combines signals from all subtrajectory lengths, reducing variance and improving credit assignment}
 \begin{itemize}\itemsep2pt
   \item $\tau$: Full trajectory $(x_0, \dots, x_N)$.
   \item $\lambda$: Positive scalar weighting different subtrajectory lengths (e.g., shorter subtrajectories get higher weight if $\lambda < 1$).
   \item The numerator sums SubTB losses over all subtrajectories $x_{m:n}$, weighted by $\lambda^{n-m}$ (length-based weighting).
-  \item The denominator normalizes to average the losses.
-  \item This combines signals from all subtrajectory lengths, reducing variance and improving credit assignment.
+  \item The denominator normalizes to average the losses..
 \end{itemize}
 
-\textbf{Where is $f$ (Learned Drift)?} $f$ is embedded in $P_F$ within each $\ell_{\text{SubTB}}$. The loss optimizes $\theta$, which includes parameters for $f$ (via NN1 and NN2: $f(\cdot, n)/\sigma = \text{NN1}(\cdot, n) + \text{NN2}(n) \cdot \nabla \log \mu(\cdot)$), steering the forward process toward the target.
+\end{errorblock}
+
 \end{frame}
 
-\begin{frame}[t]{DGFS algorithm}
 
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.9\textwidth]{figures/algo.png}
-    \end{figure}
+\begin{frame}[t,fragile]{}
+\footnotesize  
 
+\vspace{-0.2cm}
+
+\begin{algorithm}[H]
+    \footnotesize
+\caption{DGFS Training}
+\label{alg:dgfs}
+\begin{algorithmic}[1]
+\Require $\mu(\cdot)$, $\bar{\sigma}$, $N$, $\lambda$, $B$, $\eta$
+\State Init $\theta=(\theta_f,\phi)$
+\Repeat
+    \State Sample trajectories:
+    \For{$b=1$ to $B$}
+        \State $\tau^{(b)}=(x^{(b)}_0,\ldots,x^{(b)}_N)$ under $x_{n+1}=x_n+h f_{\theta_f}(x_n,n)+\sqrt{h}\bar{\sigma}\varepsilon_n$, $\varepsilon_n\sim\mathcal N(0,I)$
+    \EndFor
+    \State Build subtrajectories: $\mathcal S(\tau^{(b)})$ of $(m,n)$ with $0\le m<n\le N$
+    \State Compute SubTB loss:
+    \begin{equation*}
+    \mathcal L(\tau^{(b)};\theta)=\sum_{(m,n)\in\mathcal S(\tau^{(b)})}\lambda^{n-m}\left[\log\frac{F_\phi(x_m)\prod_{l=m}^{n-1} P_F(x_{l+1}\mid x_l;\theta_f)}{F_\phi(x_n)\prod_{l=m}^{n-1} P_B^{\mathrm{ref}}(x_l\mid x_{l+1})}\right]^2
+    \end{equation*}
+    \State $g \leftarrow \nabla_{\theta}\frac{1}{B}\sum_{b=1}^B \mathcal L(\tau^{(b)};\theta)$
+    \State $\theta \leftarrow \mathrm{Adam}(\theta, g, \eta)$
+\Until{convergence}
+\end{algorithmic}
+\end{algorithm}
 \end{frame}
 
 
@@ -571,45 +604,32 @@ L(\tau; \theta) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\text{Sub
 \begin{frame}[t]{Reduction of gradient variance}
 \footnotesize
 
+\begin{columns}[t]
+\begin{column}{0.33\textwidth}
 \begin{figure}
     \centering
-    \includegraphics[width=0.4\textwidth]{figures/grad_variance.png}
+    \includegraphics[width=\textwidth]{figures/grad_variance.png}
     \caption{Gradient variance comparison between DGFS and PIS. DGFS shows significantly lower variance, leading to more stable training.}
 \end{figure}
-
-\end{frame}
-
-\begin{frame}[t]{Accurate partition function $Z$ estimation}
-\footnotesize
-
-\textbf{Estimation of the partition function.} For an arbitrary trajectory $\tau = \{x_n\}_{n=0}^N$, one could define its (log) importance weight to be $S(\tau; \theta) = \log P(x_{0:N}) - \log Q(x_{0:N}; \theta)$, where $Q(x_{0:N}; \theta) = p^{\text{ref}}_0(x_0) \prod_{n=0}^{N-1} P_F(x_{n+1}|x_n; \theta)$.
-
-\textbf{Log-partition function (log Z) estimator:}
-\[
-\log \sum_{b=1}^B \exp(S(\tau^{(b)}; \theta)) - \log B \leq \log Z, \quad \tau^{(b)} \sim Q(\cdot; \theta).
-\]
-
-\textbf{Explanation.}
-\begin{itemize}\itemsep2pt
-  \item $S(\tau; \theta)$: The log importance weight, measuring how much more likely the trajectory is under the target $P$ (which has terminal marginal $\pi \propto \mu$) than under the learned $Q$.
-  \item $Q(x_{0:N}; \theta)$: The learned path measure, with terminal marginal approximating $\pi$.
-  \item The estimator uses importance sampling: Sample trajectories from $Q$, compute their weights, and average in log space to estimate $\log Z$.
-  \item The inequality $\leq \log Z$ holds because $Q$ approximates $P$, providing a lower bound on $\log Z$.
-  \item This gives an accurate estimate of $Z$ without needing samples from $\pi$, leveraging the learned model.
-\end{itemize}
-
-\end{frame}
-
-\begin{frame}[t]{Partition function estimation results}
-\footnotesize
-
+\end{column}
+\begin{column}{0.33\textwidth}
 \begin{figure}
     \centering
-    \includegraphics[width=1.025\textwidth]{figures/partition_fnct.png}
-    \caption{To write a caption}
+    \includegraphics[width=\textwidth]{figures/drift.png}
+    \caption{Caption for drift.png}
 \end{figure}
+\end{column}
+\begin{column}{0.33\textwidth}
+\begin{figure}
+    \centering
+    \includegraphics[width=\textwidth]{figures/grad_variance_2.png}
+    \caption{Caption for }
+\end{figure}
+\end{column}
+\end{columns}
 
 \end{frame}
+
 
 \begin{frame}[t]{Mode coverage results}
 
@@ -631,6 +651,38 @@ L(\tau; \theta) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\text{Sub
 \end{columns}
     
 \end{frame}
+
+\begin{frame}[t]{Accurate partition function $Z$ estimation}
+\footnotesize
+
+\textbf{How to Estimate $Z$.} The partition function $Z = \int \mu(x) \, dx$ normalizes the density. Since we sample trajectories from the learned process $Q$, we estimate $Z$ using importance sampling on the terminal states.
+
+\textbf{Log-partition function estimator:}
+\[
+\log \sum_{b=1}^B \exp(S(\tau^{(b)}; \theta)) - \log B \leq \log Z, \quad \tau^{(b)} \sim Q(\cdot; \theta).
+\]
+
+\textbf{Intuition (Simple).}
+\begin{itemize}\itemsep2pt
+  \item $S(\tau; \theta)$: Weight showing how well the trajectory matches the target (higher if it ends in high-$\mu$ regions).
+  \item Sample many trajectories from $Q$, compute their weights, and average in log space.
+  \item This gives a lower bound on $\log Z$ because $Q$ approximates the target, providing an estimate without direct $\pi$ samples.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[t]{Partition function estimation results}
+\footnotesize
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1.025\textwidth]{figures/partition_fnct.png}
+    \caption{The lower the better, DGFS achieves the lowest bias in estimating the partition function across various benchmarks compared to PIS and DDS.}
+\end{figure}
+
+\end{frame}
+
+
 
 \subsection{Convergence Guarantees}
 
