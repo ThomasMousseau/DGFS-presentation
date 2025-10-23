@@ -195,24 +195,7 @@ p^{\text{ref}}_n(x) = \mathcal{N}\left( x; \mu_0, \Sigma_0 + n h \sigma^2 I \rig
 
 \end{frame}
 
-% \begin{frame}[t]{Target Path Measure via Importance Sampling}
-% \footnotesize
 
-% \textbf{Importance Sampling Basics.} Importance sampling is a technique to estimate expectations under a hard-to-sample target distribution \( P \) using samples from an easy-to-sample proposal distribution \( Q \). The key formula is:
-% \[
-% \mathbb{E}_{x \sim Q} \left[ f(x) \cdot w(x) \right] = \mathbb{E}_{x \sim P} [f(x)],
-% \]
-% where the \textcolor{red}{\emph{importance weight} \( w(x) = \frac{P(x)}{Q(x)} \)} corrects the samples from \( Q \) to behave as if they were from \( P \).
-
-% \textbf{Intuition.} \( Q \) provides "biased" samples; \( w(x) \) upweights samples that are likely under \( P \) and downweights those that aren't, effectively resampling from \( P \) without directly sampling it.
-
-% \textbf{Application to Path Measures.} In our case, the "samples" are entire trajectories \( x_{0:N} \), and we want the path measure \( P \) to have the correct terminal marginal \( \pi(x_N) \propto \mu(x_N) \). We use the reference path measure \( Q^{\text{ref}} \) (easy to sample, e.g., Gaussian paths) as the proposal. The reweighted path measure is:
-% \[
-% P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \cdot w(x_{0:N}),
-% \]
-% where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This ensures \( P(x_N) \propto \mu(x_N) \), as the weight depends only on the endpoint.
-
-% \end{frame}
 
 % \begin{frame}[t]{Target Path Measure via IS (Part 2)}
 % \footnotesize
@@ -271,6 +254,27 @@ P(x_{0:N}) \;\propto\; Q^{\text{ref}}(x_{0:N-1} | x_N) \mu(x_N) \;\propto\ Q^{\t
 \mathbb E_{Q}\!\left[\log\frac{p^{\text{ref}}_N(x_N)}{\mu(x_N)}\right]
 =\mathbb E_Q\!\big[\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\big]
 \]
+
+\note{ \textcolor{red}{Je devrais avoir une slide complete a explier d'ou vient le foward target process $P$ parce que c'est le coeur de mon algorithme} }
+\end{frame}
+
+\begin{frame}[t]{Target Path Measure via Importance Sampling}
+\footnotesize
+
+\textbf{Importance Sampling Basics.} Importance sampling is a technique to estimate expectations under a hard-to-sample target distribution \( P \) using samples from an easy-to-sample proposal distribution \( Q \). The key formula is:
+\[
+\mathbb{E}_{x \sim Q} \left[ f(x) \cdot w(x) \right] = \mathbb{E}_{x \sim P} [f(x)],
+\]
+where the \textcolor{red}{\emph{importance weight} \( w(x) = \frac{P(x)}{Q(x)} \)} corrects the samples from \( Q \) to behave as if they were from \( P \).
+
+\textbf{Intuition.} \( Q \) provides "biased" samples; \( w(x) \) upweights samples that are likely under \( P \) and downweights those that aren't, effectively resampling from \( P \) without directly sampling it.
+
+\textbf{Application to Path Measures.} In our case, the "samples" are entire trajectories \( x_{0:N} \), and we want the path measure \( P \) to have the correct terminal marginal \( \pi(x_N) \propto \mu(x_N) \). We use the reference path measure \( Q^{\text{ref}} \) (easy to sample, e.g., Gaussian paths) as the proposal. The reweighted path measure is:
+\[
+P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \cdot w(x_{0:N}),
+\]
+where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This ensures \( P(x_N) \propto \mu(x_N) \), as the weight depends only on the endpoint.
+
 \end{frame}
 
 %!Diffusion Denoising Score Matching slides removed for brevity 
@@ -372,7 +376,7 @@ This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusi
 \begin{table}[h]
 \centering
 \footnotesize
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular}{@{}lcc@{}}
 \toprule
 \textbf{Concept} & \textbf{GFlowNet} & \textbf{SOC} \\
 \midrule
@@ -424,7 +428,7 @@ This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusi
 \begin{frame}[t]{Decomposition of the Target Process}
 \footnotesize
 
-\textbf{Target Process Decomposition.} The target path measure (Equation 4) can be decomposed into a product of conditional distributions:
+\textbf{Target Process Decomposition.} The target path measure can be decomposed into a product of conditional distributions:
 \[
 P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)} \implies P(x_N) \propto \mu(x_N).
 \]
@@ -694,7 +698,12 @@ L(\tau; \theta) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\text{Sub
 
 \end{frame}
 
-\subsection{Limitations and Future Work}
+\subsection{Q\&A}
+
+\begin{frame}{Questions and hopefully answers :)}
+    \centering
+    \Huge Questions?
+\end{frame}
 
 
 \end{document}
