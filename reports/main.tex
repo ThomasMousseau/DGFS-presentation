@@ -433,138 +433,103 @@ This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusi
 P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)} \implies P(x_N) \propto \mu(x_N).
 \]
 
-\textbf{Conditional Form (Equation 10).} Since the reweighting only affects the terminal state, the joint can be written as:
+\textbf{Conditional Form.} Since the reweighting only affects the terminal state, the joint can be written as:
 \[
 P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} P_B^{\text{ref}}(x_n | x_{n+1}),
 \]
-where $P_B^{\text{ref}}(\cdot | \cdot)$ is the backward transition probability (derived from the target joint). This is tractable because $P_B^{\text{ref}}$ is known (e.g., a Gaussian bridge for diffusion processes).
+where $P_B^{\text{ref}}(\cdot | \cdot)$ is the backward transition probability (derived from the target joint). This is tractable because $P_B^{\text{ref}}$ is known because they are Gaussian convolutions with a known mean and variance.
 
-\textbf{Intuition.} This factorization shows that the target process is like sampling backward from the terminal distribution $\pi(x_N)$, using the backward kernel to condition earlier states. It's analogous to reverse-time diffusion, where we start from the target and go backward.
-
-\end{frame}
-
-\begin{frame}[t]{Rewriting the Target Process with Marginal}
-\tiny
-
-\textbf{Rewriting the Joint Using Marginal Densities.} The backward factorization of the target process is:
-\[
-P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} P_B^{\text{ref}}(x_n | x_{n+1}).
-\]
-
-To express it in terms of the marginal densities $p_n(x_n)$, note that the marginal at step $n$ is obtained by integrating out the future states $x_{n+1:N}$ from the joint:
-\[
-p_n(x_n) = \int P(x_{0:N}) \, dx_{0:n-1} \, dx_{n+1:N} = \int \pi(x_N) \prod_{l=n}^{N-1} P_B^{\text{ref}}(x_l | x_{l+1}) \, dx_{n+1:N} \propto \int \mu(x_N) \prod_{l=n}^{N-1} P_B^{\text{ref}}(x_l | x_{l+1}) \, dx_{n+1:N}.\]
-This shows that $p_n(x_n)$ is the "unnormalized" density at step $n$, propagated backward from the terminal $\pi(x_N)$ via the backward transitions.
-
-\textbf{What $p_n(x_n)$ Represents.} 
-\begin{itemize}\itemsep2pt
-  \item $p_N(x_N) = \pi(x_N)$: The terminal marginal, which is the normalized target density we want to match (proportional to $\mu(x_N)$).
-  \item For $n < N$, $p_n(x_n)$ is the marginal density at step $n$ under the target process $P$. It represents how likely the state $x_n$ is at time $n$, given that the trajectory will eventually reach a terminal state distributed as $\pi(x_N)$. In other words, it's the distribution of $x_n$ marginalized over all possible future paths that lead to $\pi(x_N)$.
-  \item Intuitively, $p_n(x_n)$ encodes the "value" or importance of being at $x_n$ at step $n$, as it accounts for the probability of reaching high-$\mu$ terminals from there. This is why approximating $p_n(x_n)$ allows training with partial trajectories starting from step $n$.
-\end{itemize}
-
-\textbf{Why This Helps in Writing the Target Process.} The joint $P(x_{0:N})$ can be thought of as a chain where each $p_n(x_n)$ summarizes the "progress" toward the terminal, but the backward form directly ties it to $\pi(x_N)$. By learning $F_n \approx p_n$, we can reconstruct or approximate the joint without computing the full integral, enabling efficient partial-trajectory optimization.
+\note{conditional form is exactly like the RHS of the trajectory balance equation in gfn. \textcolor{red}{Lire le paper de Nikolay sur Trajectory Balance pour bien comprendre cette equation et comment elle se relie a DGFS}}
 
 \end{frame}
 
-\begin{frame}[t]{Rewriting the Target Process with Marginal}
-\tiny
+% \begin{frame}[t]{Rewriting the Target Process with Marginal}
+% \tiny
 
-\textbf{If We Had Access to $p_n(x_n)$.} We could write the partial joint as:
+% \textbf{Rewriting the Joint Using Marginal Densities.} The backward factorization of the target process is:
+% \[
+% P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} P_B^{\text{ref}}(x_n | x_{n+1}).
+% \]
+
+% To express it in terms of the marginal densities $p_n(x_n)$, note that the marginal at step $n$ is obtained by integrating out the future states $x_{n+1:N}$ from the joint:
+% \[
+% p_n(x_n) = \int P(x_{0:N}) \, dx_{0:n-1} \, dx_{n+1:N} = \int \pi(x_N) \prod_{l=n}^{N-1} P_B^{\text{ref}}(x_l | x_{l+1}) \, dx_{n+1:N} \propto \int \mu(x_N) \prod_{l=n}^{N-1} P_B^{\text{ref}}(x_l | x_{l+1}) \, dx_{n+1:N}.\]
+% This shows that $p_n(x_n)$ is the "unnormalized" density at step $n$, propagated backward from the terminal $\pi(x_N)$ via the backward transitions.
+
+% \textbf{What $p_n(x_n)$ Represents.} 
+% \begin{itemize}\itemsep2pt
+%   \item $p_N(x_N) = \pi(x_N)$: The terminal marginal, which is the normalized target density we want to match (proportional to $\mu(x_N)$).
+%   \item For $n < N$, $p_n(x_n)$ is the marginal density at step $n$ under the target process $P$. It represents how likely the state $x_n$ is at time $n$, given that the trajectory will eventually reach a terminal state distributed as $\pi(x_N)$. In other words, it's the distribution of $x_n$ marginalized over all possible future paths that lead to $\pi(x_N)$.
+%   \item Intuitively, $p_n(x_n)$ encodes the "value" or importance of being at $x_n$ at step $n$, as it accounts for the probability of reaching high-$\mu$ terminals from there. This is why approximating $p_n(x_n)$ allows training with partial trajectories starting from step $n$.
+% \end{itemize}
+
+% \textbf{Why This Helps in Writing the Target Process.} The joint $P(x_{0:N})$ can be thought of as a chain where each $p_n(x_n)$ summarizes the "progress" toward the terminal, but the backward form directly ties it to $\pi(x_N)$. By learning $F_n \approx p_n$, we can reconstruct or approximate the joint without computing the full integral, enabling efficient partial-trajectory optimization.
+
+% \end{frame}
+
+\begin{frame}[t]{Rewriting the Target Process with Marginal}
+\scriptsize
+
+\textbf{If We Had Access to $p_n(x_n)$} we could write the partial joint which would allow training on subtrajectories and thus have better credit assignment:
 \[
 P(x_{0:n}) = p_n(x_n) \prod_{k=0}^{n-1} P_B(x_k | x_{k+1}),
 \]
-where $P_B$ is the backward kernel. This would allow us to define partial trajectory targets, enabling training with shorter trajectories and better credit assignment.
 
 \textbf{But There's No Closed Form for $p_n(x_n)$.} To calculate $p_n(x_n)$, we would need to compute the integral:
 \[
-p_n(x_n) = \int \pi(x_N) \prod_{l=n}^{N-1} P_B(x_l | x_{l+1}) \, dx_{n+1:N}.
+p_n(x_n) = \int \pi(x_N) \prod_{n}^{N-1} P_B(x_n | x_{n+1}) \, dx_{n+1:N}.
 \]
-This is a high-dimensional integral with no analytical solution for general $\pi$.
 
-\textbf{Why Parameterize Both $F_n(\theta)$ and $P_F$?} The constraint requires both: $F_n$ approximates $p_n$, and $P_F$ is the forward policy we learn. We can't simply calculate the forward process because it's unknown—we're learning it to steer trajectories toward the target. Parameterizing both allows the constraint to hold, enabling amortized learning without per-step integrals.
+\textbf{Why Is $p_n(x_n)$ Hard to Compute?} The reference marginal at step $N$ is a simple Gaussian formula. But for the target marginal at earlier steps $n < N$, there's no easy formula because the target process depends on the terminal state $\pi(x_N)$, making it complex. Computing it needs integrating over many future states, which can't be done analytically for general targets. At $n = N$, it's just $\pi(x_N)$, but earlier steps are harder.
 
-\textbf{Naive Alternative: Monte Carlo Quadrature.} Quadrature is a numerical integration method that approximates integrals by evaluating the integrand at a set of points (nodes) and weighting them. Monte Carlo quadrature uses random sampling for high dimensions.
 
-\textbf{Why Expensive.} Quadrature requires many evaluations of the integrand (e.g., sampling trajectories), which is computationally intensive and scales poorly with dimensionality, making it impractical for per-training-step use as a replacement for $p_n$.
+\textbf{Solution: Learn an Approximation $F_n \approx p_n$.} We introduce a learned flow function $F_n(x_n; \theta)$ parameterized by a neural network to approximate $p_n(x_n)$. This avoids computing the intractable integral at every training step.
+
+\note{ne pas oublier de parler des MC quadrature method pour approximer l'integral mais c'est couteux en temps de calcul et pas scalable du tout}
 
 \end{frame}
 
-\begin{frame}[t]{Amortized Training: The Subtrajectory Constraint}
+\begin{frame}[t]{Trajectory Balance with Learned Flow}
 \footnotesize
 
-\textbf{Proposed Amortized Approach.} Train $F_n(\cdot; \theta)$ to satisfy the following constraint for all partial trajectories $x_{n:N}$:
+\textbf{Proposed Amortized Approach.} Train $F_n(\cdot; \phi)$ to satisfy the following constraint for all partial trajectories $x_{n:N}$:
 \[
-F_n(x_n; \theta) \prod_{l=n}^{N-1} P_F(x_{l+1} | x_l; \theta) = \mu(x_N) \prod_{l=n}^{N-1} P_B(x_l | x_{l+1}).
+F_n(x_n; \phi) \prod_{k=n}^{N-1} P_F(x_{k+1} | x_k; \theta) = \mu(x_N) \prod_{k=n}^{N-1} P_B(x_k | x_{k+1}).
 \]
 
 \textbf{Details.}
 \begin{itemize}\itemsep2pt
-  \item $P_F$ (forward policy) and $F_n$ are parameterized by deep neural networks.
-  \item Once this constraint holds, $F_n(x_n; \theta)$ equals the integral in Equation 11, amortizing the integration into the learning of $\theta$.
+  \item $P_F$ (forward policy) and $F_n$ are parameterized by deep neural networks, with parameters $\theta$ and $\phi$ respectively.
+  \item We can view $F_n$ as an approximation to the unknown marginal $p_n(x_n)$ thus an amortized way to estimate the intractable integral.
   \item We use only $\mu(\cdot)$ (no $Z$), so the unknown normalization is absorbed into $F_n$.
 \end{itemize}
-
-\textbf{Decision.} This avoids per-step quadrature by enforcing a global constraint on partial trajectories, making training efficient and scalable.
-
 \end{frame}
 
-\begin{frame}[t]{Training Objective and Implementation}
+\begin{frame}[t]{Detailed Balance with Learned Flow}
 \footnotesize
 
-\textbf{Training Objective.} Regress the left-hand side (LHS) of the constraint to the right-hand side (RHS). For stability, perform this in log space:
-\[
-\min_\theta \left| \log(\text{LHS}) - \log(\text{RHS}) \right|.
-\]
-
-\textbf{Details.}
-\begin{itemize}\itemsep2pt
-  \item This is a regression loss that minimizes the difference between the learned flow products and the target products involving $\mu$.
-  \item Log space prevents numerical issues from large or small values.
-\end{itemize}
-
-\textbf{Shared Parameters.} The flow function at different steps shares the same parameters; achieved by adding a step embedding input to the network $F(\cdot, n; \theta)$.
-
-\textbf{Decision.} Sharing parameters reduces model complexity and ensures consistency across time steps, while embeddings allow step-specific behavior.
-
-\end{frame}
-
-\begin{frame}[t]{Derived Subtrajectory Balance (SubTB)}
-\footnotesize
-
-\textbf{Deriving SubTB.} Comparing the constraint for $n$ and $n+1$ gives a formula independent of $\mu$:
+\textbf{Deriving SubTB.} Comparing the constraint for $n$ and $n+1$ gives a formula independent of $\mu$ which now only involves local transitions (signal subtrajectories instead of full trajectories)
 \[
 F_n(x_n; \theta) P_F(x_{n+1} | x_n; \theta) = F_{n+1}(x_{n+1}; \theta) P_B(x_n | x_{n+1}).
 \]
 
-\textbf{Details.}
-\begin{itemize}\itemsep2pt
-  \item This is the Subtrajectory Balance (SubTB) constraint, a generalization of detailed balance for partial trajectories.
-  \item It provides intermediate learning signals without needing $\mu$ directly, improving credit assignment.
-\end{itemize}
-
-\textbf{Overall Decision.} The method learns two neural networks: the flow $F(\cdot, n; \theta)$ and the forward policy $P_F$. This setup enables efficient, stable training with intermediate supervision.
 \end{frame}
 
-\begin{frame}[t]{Subtrajectory Balance (SubTB) Loss}
+\begin{frame}[t]{Detailed Balance Loss for Subtrajectories}
 \footnotesize
 
-\textbf{SubTB Loss for Partial Trajectories.}
+\textbf{Detailed Balance Loss for Partial Trajectories.}
 \[
-\ell_{\text{SubTB}}(x_{m:n}; \theta) = \left( \log \frac{F_m(x_m; \theta) \prod_{l=m}^{n-1} P_F(x_{l+1} | x_l; \theta)}{F_n(x_n; \theta) \prod_{l=m}^{n-1} P_B(x_l | x_{l+1})} \right)^2
+\ell_{\text{DB}}(x_{m:n}; \theta, \phi) = \left( \log \frac{F_m(x_m; \phi) \prod_{k=m}^{n-1} P_F(x_{k+1} | x_k; \theta)}{F_n(x_n; \phi) \prod_{k=m}^{n-1} P_B(x_k | x_{k+1})} \right)^2
 \]
 
-\textbf{Explanation of Parameters and Variables.}
-\begin{itemize}\itemsep2pt
-  \item $\theta$: Parameters of the neural networks (for $F_n$ and $P_F$).
-  \item $x_{m:n}$: Subtrajectory from step $m$ to $n$ (partial path $x_m, \dots, x_n$).
-  \item $F_m(x_m; \theta)$: Learned flow function approximating the marginal density at step $m$.
-  \item $P_F(x_{l+1} | x_l; \theta)$: Learned forward transition probability (includes the drift $f$).
-  \item $P_B(x_l | x_{l+1})$: Fixed backward transition probability (reference, known).
-  \item The loss enforces balance for subtrajectories, providing intermediate signals without full trajectories.
-\end{itemize}
+\textbf{Forward Process (Controlled).} The learned forward transition depends on \(\theta\):
+\[
+P_F(x_{n+1} | x_n; \theta) = \mathcal{N}\left( x_{n+1}; x_n + h f_\theta(x_n, n), h \sigma^2 I \right),
+\]
+where \(f(x_n, n)\) is the learned drift parameterized by \(\theta\).
 
-\textbf{Where is $f$ (Learned Drift)?} $f$ appears in $P_F$, as $P_F(x_{n+1} | x_n; \theta) = \mathcal{N}(x_{n+1}; x_n + h f(x_n, n), h\sigma^2 I)$, where $f$ is parameterized by neural networks.
+\note{a voir si je voudrais pas mettre une schema sur l'une des 3 derniers slides pour faire un recap de scrap la SOC objective, now we build DB loss with learned flow to solve credit assignment problem}
 
 \end{frame}
 
