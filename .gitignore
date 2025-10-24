@@ -17,3 +17,5 @@ reports/*.snm
 *.blg   
 *.bcf
 *.run.xml
+reports/main.bbl-*
+reports/main.bcf-*

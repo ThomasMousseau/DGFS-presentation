@@ -199,6 +199,26 @@ p^{\text{ref}}_n(x) = \mathcal{N}\left( x; \mu_0, \Sigma_0 + n h \sigma^2 I \rig
 
 \end{frame}
 
+\begin{frame}{Closed Form of Reference Marginal}
+\footnotesize
+
+\textbf{Reference Process.}
+\[
+x_N = x_0 + \sqrt{h} \sigma \sum_{k=0}^{N-1} \varepsilon_k.
+\]
+
+\textbf{Distribution of Terminal State.} Since the sum of independent Gaussians is Gaussian:
+\[
+x_N \sim \mathcal{N}(m_0, \Sigma_0 + N h \sigma^2 I).
+\]
+
+\textbf{Terminal Marginal Density.}
+\[
+p^{\text{ref}}_N(x) = \frac{1}{(2\pi)^{D/2} |\Sigma_0 + N h \sigma^2 I|^{1/2}} \exp\left( -\frac{1}{2} (x - m_0)^\top (\Sigma_0 + N h \sigma^2 I)^{-1} (x - m_0) \right).
+\]
+
+\end{frame}
+
 
 
 % \begin{frame}[t]{Target Path Measure via IS (Part 2)}
@@ -340,7 +360,7 @@ where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This
 %------------------------------------------------
 \section{Stochastic Optimal Control to GFlowNets}
 
-\subsection{Target Process}
+\subsection{Credit Assignment Problem in SOC}
 
 \begin{frame}[t]{Credit Assignment Problem in SOC objective}
 \footnotesize
@@ -349,7 +369,7 @@ where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This
 \min_{f_\theta}\ \mathbb E_Q\!\Big[\underbrace{\sum_{n=0}^{N-1}\tfrac{h}{2\sigma^2}\|f_\theta(x_n,n)\|^2}_{\text{Running cost}}\;+\;\underbrace{\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)}_{\text{Terminal cost}}\Big]
 \]
 
-This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusion-based Sampling for Unnormalized Densities} by Dinghuai Zhang et al which presented the sampling from unnormalized densities as a stochastic optimal control problem.
+This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusion-based Sampling for Unnormalized Densities} \cite{zhang2022} et al which presented the sampling from unnormalized densities as a stochastic optimal control problem.
 
 \end{errorblock}
 
@@ -394,7 +414,7 @@ This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusi
 \end{tabular}
 \end{table}
 
-\textbf{Insight.} Since SOC can be viewed as a GFlowNet, we can apply GFlowNet tools (e.g., detailed balance loss, subtrajectory balance) to solve the credit assignment problem in diffusion sampling.
+\textbf{Insight.} Since SOC can be viewed as a GFlowNet, we can apply GFlowNet tools (e.g., detailed balance loss, subtrajectory balance) to solve the credit assignment problem.
 
 \note{make a mental note to comeback to professor hernandez comment on Tristan's Deleu presentation when someone asked: "The if GFlowNets are just Reinfrocement Learning, then why keep doing research on this framework?" Professor Hernandez reponded by proving the felxibility of GFN, he said that it was en entery point between RL, Diffusion models, Energy-based models and in this case we prove that it can also be used in Stochastic Optimal Control problems.}
 
@@ -429,19 +449,28 @@ This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusi
 
 \subsection{GFlowNet}
 
-\begin{frame}[t]{Decomposition of the Target Process}
+\begin{frame}[t]{Adressing Credit Assignment via Target Process}
 \footnotesize
 
-\textbf{Target Process Decomposition.} The target path measure can be decomposed into a product of conditional distributions:
-\[
+\begin{errorblock}{Target process necessitates terminal reweighting...}
+    \[
 P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)} \implies P(x_N) \propto \mu(x_N).
 \]
+\end{errorblock}
 
-\textbf{Conditional Form.} Since the reweighting only affects the terminal state, the joint can be written as:
+\begin{block}{Could we write the target process differently to allow intermediate supervision?}
+
+    \textbf{Conditional Form.} Since the reweighting only affects the terminal state, the joint can be written as:
 \[
-P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} P_B^{\text{ref}}(x_n | x_{n+1}),
+P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} Q_B^{\text{ref}}(x_n | x_{n+1}),
 \]
-where $P_B^{\text{ref}}(\cdot | \cdot)$ is the backward transition probability (derived from the target joint). This is tractable because $P_B^{\text{ref}}$ is known because they are Gaussian convolutions with a known mean and variance.
+where $Q_B^{\text{ref}}(\cdot | \cdot)$ is the backward transition probability (derived from the target joint). This is tractable because $Q_B^{\text{ref}}$ is known.
+
+\end{block}
+
+
+
+
 
 \note{conditional form is exactly like the RHS of the trajectory balance equation in gfn. \textcolor{red}{Lire le paper de Nikolay sur Trajectory Balance pour bien comprendre cette equation et comment elle se relie a DGFS}}
 
@@ -476,18 +505,19 @@ where $P_B^{\text{ref}}(\cdot | \cdot)$ is the backward transition probability (
 
 \textbf{If We Had Access to $p_n(x_n)$} we could write the partial joint which would allow training on subtrajectories and thus have better credit assignment:
 \[
-P(x_{0:n}) = p_n(x_n) \prod_{k=0}^{n-1} P_B(x_k | x_{k+1}),
+P(x_{0:n}) = p_n(x_n) \prod_{k=0}^{n-1} Q^\text{ref}_B(x_k | x_{k+1}),
 \]
 
 \textbf{But There's No Closed Form for $p_n(x_n)$.} To calculate $p_n(x_n)$, we would need to compute the integral:
 \[
-p_n(x_n) = \int \pi(x_N) \prod_{n}^{N-1} P_B(x_n | x_{n+1}) \, dx_{n+1:N}.
+p_n(x_n) = \int \pi(x_N) \prod_{n}^{N-1} Q^\text{ref}_B(x_n | x_{n+1}) \, dx_{n+1:N}.
 \]
 
-\textbf{Why Is $p_n(x_n)$ Hard to Compute?} The reference marginal at step $N$ is a simple Gaussian formula. But for the target marginal at earlier steps $n < N$, there's no easy formula because the target process depends on the terminal state $\pi(x_N)$, making it complex. Computing it needs integrating over many future states, which can't be done analytically for general targets. At $n = N$, it's just $\pi(x_N)$, but earlier steps are harder.
+\[
+p_n(x_n) \propto \int_{\mathbb{R}^{(N-n)D}} \mu(x_N) \prod_{k=n}^{N-1} Q^{\text{ref}}B(x_k | x_{k+1}) , dx_{n+1:N}.
+\]
 
-
-\textbf{Solution: Learn an Approximation $F_n \approx p_n$.} We introduce a learned flow function $F_n(x_n; \theta)$ parameterized by a neural network to approximate $p_n(x_n)$. This avoids computing the intractable integral at every training step.
+\textbf{Why is $p_n(x_n)$ hard to compute?} The integral represents summing over all possible future paths from $x_n$ to the terminal $x_N$, weighting each by the terminal density $\pi(x_N)$. This high-dimensional integration (over $(N-n)\times D$ dimensions) has no analytical solution for general $\mu(x_N)$. Numerically approximating it via quadratures or Monte Carlo is computationally expensive, especially since training requires computing it repeatedly for subtrajectories as intermediate signals (replacing the single terminal signal), making it impractical.
 
 \note{ne pas oublier de parler des MC quadrature method pour approximer l'integral mais c'est couteux en temps de calcul et pas scalable du tout}
 
@@ -496,7 +526,7 @@ p_n(x_n) = \int \pi(x_N) \prod_{n}^{N-1} P_B(x_n | x_{n+1}) \, dx_{n+1:N}.
 \begin{frame}[t]{Trajectory Balance with Learned Flow}
 \footnotesize
 
-\textbf{Proposed Amortized Approach.} Train $F_n(\cdot; \phi)$ to satisfy the following constraint for all partial trajectories $x_{n:N}$:
+\textbf{Proposed Amortized Approach.} Train $F_n(\cdot; \phi)$, a neural network, to satisfy the following constraint for all partial trajectories $x_{n:N}$:
 \[
 F_n(x_n; \phi) \prod_{k=n}^{N-1} P_F(x_{k+1} | x_k; \theta) = \mu(x_N) \prod_{k=n}^{N-1} P_B(x_k | x_{k+1}).
 \]
@@ -506,32 +536,30 @@ F_n(x_n; \phi) \prod_{k=n}^{N-1} P_F(x_{k+1} | x_k; \theta) = \mu(x_N) \prod_{k=
   \item $P_F$ (forward policy) and $F_n$ are parameterized by deep neural networks, with parameters $\theta$ and $\phi$ respectively.
   \item We can view $F_n$ as an approximation to the unknown marginal $p_n(x_n)$ thus an amortized way to estimate the intractable integral.
   \item We use only $\mu(\cdot)$ (no $Z$), so the unknown normalization is absorbed into $F_n$.
+  \item Very similar to a Value Function in RL, estimating future expected rewards (here, future density mass).
 \end{itemize}
 \end{frame}
 
-\begin{frame}[t]{Detailed Balance with Learned Flow}
+\begin{frame}[t]{Detailed and SubTB Balance with Learned Flow}
 \footnotesize
 
-\textbf{Detailed Balance from Trajectory Balance condition.} Comparing the constraint for $n$ and $n+1$ gives a formula independent of $\mu$ which now only involves local transitions (signal subtrajectories instead of full trajectories)
+\begin{errorblock}{Detailed Balance from Trajectory Balance condition.} Comparing the constraint for $n$ and $n+1$ gives a formula independent of $\mu$ which now only involves local transitions (signal subtrajectories instead of full trajectories)
 \[
 F_n(x_n; \theta) P_F(x_{n+1} | x_n; \theta) = F_{n+1}(x_{n+1}; \theta) P_B(x_n | x_{n+1}).
 \]
 
-\end{frame}
+\end{errorblock}
 
-\begin{frame}[t]{Subtrajectories Loss}
-\footnotesize
 
-\textbf{Subtrajectory Balance Loss for Partial Trajectories.}
-\[
+\begin{block}{Subtrajectory Balance Loss for Partial Trajectories}
+
+    \[
 \ell_{\text{SubTB}}(x_{m:n}; \theta, \phi) = \left( \log \frac{F_m(x_m; \phi) \prod_{k=m}^{n-1} P_F(x_{k+1} | x_k; \theta)}{F_n(x_n; \phi) \prod_{k=m}^{n-1} P_B(x_k | x_{k+1})} \right)^2
 \]
 
-\textbf{Forward Process (Controlled).} The learned forward transition depends on \(\theta\):
-\[
-P_F(x_{n+1} | x_n; \theta) = \mathcal{N}\left( x_{n+1}; x_n + h f_\theta(x_n, n), h \sigma^2 I \right),
-\]
-where \(f(x_n, n)\) is the learned drift parameterized by \(\theta\).
+Using a mix of different subtrajectory lengths $(m,n)$ allows better credit assignment thus more stable training of both the forward policy and the learned flow.
+    
+\end{block}
 
 \note{a voir si je voudrais pas mettre une schema sur l'une des 3 derniers slides pour faire un recap de scrap la SOC objective, now we build DB loss with learned flow to solve credit assignment problem}
 
