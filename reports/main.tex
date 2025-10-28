@@ -3,7 +3,7 @@
 %----------------------------------------------------------------------------------------
 
 \documentclass[aspectratio=169,xcolor=dvipsnames]{beamer}
-% \setbeameroption{show notes} %TODO: Thomas a enlever avant la presentation
+\setbeameroption{show notes} %TODO: Thomas a enlever avant la presentation
 \usetheme{SimplePlus}
 
 \useoutertheme{miniframes}  % Adds horizontal navigation dots at the top for subsections
@@ -36,6 +36,9 @@
 
 % Define hyphenation command
 \newcommand{\hyp}{-}
+
+% Define real numbers symbol
+\newcommand{\R}{\mathbb{R}}
 
 %----------------------------------------------------------------------------------------
 %    TITLE PAGE
@@ -730,18 +733,18 @@ with only full paths}
     
 \end{frame}
 
-\begin{frame}[t]{Off-policy training capability (a voir si on garde cette slide)}
-\footnotesize
+% \begin{frame}[t]{Off-policy training capability (a voir si on garde cette slide)}
+% \footnotesize
 
-\textbf{Off-Policy Training in DGFS.} Unlike previous KL-based methods restricted to on-policy training (high-variance off-policy via importance sampling), DGFS supports off-policy exploration without it, as its objectives (Eq. 9/14) don't require samples from a specific distribution \cite{malkin2023,lahlou2023}.
+% \textbf{Off-Policy Training in DGFS.} Unlike previous KL-based methods restricted to on-policy training (high-variance off-policy via importance sampling), DGFS supports off-policy exploration without it, as its objectives (Eq. 9/14) don't require samples from a specific distribution \cite{malkin2023,lahlou2023}.
 
-\textbf{Exploration Strategy.} Use a larger variance coefficient \(\tilde{\sigma} > \sigma\) in the forward process during rollouts to capture diverse modes, improving multimodal sampling.
+% \textbf{Exploration Strategy.} Use a larger variance coefficient \(\tilde{\sigma} > \sigma\) in the forward process during rollouts to capture diverse modes, improving multimodal sampling.
 
-\textbf{Example: MoG+ Task.} With distant modes, setting \(\tilde{\sigma} = 2\) (vs. \(\sigma = 1\)) achieves better mode coverage and lower Z estimation bias.
+% \textbf{Example: MoG+ Task.} With distant modes, setting \(\tilde{\sigma} = 2\) (vs. \(\sigma = 1\)) achieves better mode coverage and lower Z estimation bias.
 
-\textbf{DGFS+ Experiment.} Linearly anneal \(\tilde{\sigma}\) from 1.1 to 1 over first 1000 steps, enhancing performance in some scenarios as a tunable hyperparameter.
+% \textbf{DGFS+ Experiment.} Linearly anneal \(\tilde{\sigma}\) from 1.1 to 1 over first 1000 steps, enhancing performance in some scenarios as a tunable hyperparameter.
 
-\end{frame}
+% \end{frame}
 
 
 
@@ -753,6 +756,21 @@ with only full paths}
 \footnotesize
 
 \textbf{Summary.} Diffusion Generative Flow Sampler (DGFS), a novel algorithm that trains diffusion models to sample from given unnormalized target densities. Different from prior works (Path Integral Sampler and Denoising Diffusion Sampler) that could only learn from complete diffusion chains, DGFS can update its parameters with only partial specification of the stochastic process trajectory. These features help DGFS benefit from efficient credit assignment and thus achieve better partition function estimation bias in the sampling benchmarks while keeping the theoretical guarantees of convergence from diffusion-based samplers.
+
+\end{frame}
+
+\begin{frame}{Future Work}
+\footnotesize
+
+\textbf{Rare Event Sampling.} Extend DGFS to efficiently sample from rare event distributions, where the target density is concentrated in low-probability regions of the reference process. 
+
+\medskip
+
+\textbf{Movement from Path Space to Latent Space.} Many diffusion models operate in latent spaces for high-dimensional data (e.g., images). Adapting DGFS to learn flows in latent spaces could improve scalability and efficiency. It means they don't have to start with $\R^d$ as state space but could work in any latent space.
+
+\medskip
+
+\textbf{Introduce trick from RL.} Incorporate techniques from reinforcement learning, such as experience replay with buffer, off-policy training to improve exploration and sample efficiency in DGFS.
 
 \end{frame}
 
