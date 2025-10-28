@@ -751,11 +751,44 @@ with only full paths}
 %------------------------------------------------
 \section{Conclusion}
 
-\subsection{Summary}
-\begin{frame}{Conclusion}
+\begin{frame}{Strengths of DGFS}
 \footnotesize
 
-\textbf{Summary.} Diffusion Generative Flow Sampler (DGFS), a novel algorithm that trains diffusion models to sample from given unnormalized target densities. Different from prior works (Path Integral Sampler and Denoising Diffusion Sampler) that could only learn from complete diffusion chains, DGFS can update its parameters with only partial specification of the stochastic process trajectory. These features help DGFS benefit from efficient credit assignment and thus achieve better partition function estimation bias in the sampling benchmarks while keeping the theoretical guarantees of convergence from diffusion-based samplers.
+\begin{block}{Strengths}
+\begin{itemize}\itemsep2pt
+  \item Works from unnormalized targets. Trains directly with \(\mu(x)\) (and optionally \(\nabla \log \mu\)), no dataset or partition function \(Z\) needed.
+  \item Well-calibrated endpoints. At convergence the terminal marginal \(p_N(x)\) matches \(\pi(x) \propto \mu(x)\); samples come with the right probabilities.
+  \item Intermediate learning signals. Subtrajectory Balance (SubTB) provides supervision on partial paths \(x_{m:n}\), solving the “terminal-only signal” issue of path-KL samplers (better temporal credit assignment, lower variance).
+  \item Fixed, closed-form backward. By terminal tilting, the target’s backward kernel equals the reference bridge (Gaussian, analytic), giving stable, non-circular constraints.
+\end{itemize}
+\end{block}
+
+\end{frame}
+
+
+\begin{frame}{Weaknesses of DGFS}
+\footnotesize
+
+
+\begin{errorblock}{Weaknesses / Limitations}
+\begin{itemize}\itemsep1pt
+  \item Reliance on Gaussian reference. Closed-form backward requires (near-)Gaussian reference with constant covariance; non-Gaussian or state-dependent noise breaks the neat math.
+  \item Two nets to train. Must learn both the forward drift and the flow \(F_n\); more parameters, more tuning (time embeddings, loss weights).
+  \item \(\mu\)-query cost. Frequent evaluations of \(\mu(x)\) (and possibly \(\nabla \log \mu\)) can be expensive; SubTB helps, but large-scale tasks need caching/replay/prioritization.
+  \item Coverage still hard in high-D. Even with SubTB, exploring multi-modal, high-barrier landscapes can stall without tempering, momentum, or preconditioning.
+  \item State-space must match target. DGFS assumes a fixed continuous state space \(\mathbb{R}^D\); discrete/structured spaces need bespoke references/backwards or relaxations.
+  \item Hyperparameter sensitivity. Noise scale \(\bar{\sigma}\), step size \(h\), SubTB length-mixing \(\lambda\), and trajectory-sampling strategy materially affect stability/convergence.
+\end{itemize}
+\end{errorblock}
+
+\end{frame}
+
+\subsection{Final Thoughts and Future Work}
+\begin{frame}{Personal Opinion on this work}
+\footnotesize
+
+ This paper addresses a clear problem with path-space samplers, which is that both PIS and DDS required full trajectory signals to learn. By introducing subtrajectory signals from the GFlowNet framework, they were definitely able to reduce the credit assignment problem. Before being able to use any of these path samplers in settings where we only have the unnormalized density function, mainly in chemistry and physics, we will need much better mode coverage since these unnormalized densities are highly multidimensional. The difficult benchmarks have shown that we are not there yet, but there is still a lot of work to do on mode discovery and sample efficiency in order to use these models in real-life applications.
+
 
 \end{frame}
 
@@ -771,6 +804,8 @@ with only full paths}
 \medskip
 
 \textbf{Introduce trick from RL.} Incorporate techniques from reinforcement learning, such as experience replay with buffer, off-policy training to improve exploration and sample efficiency in DGFS.
+
+\textcolor{red}{could add something with the partition function estimation Z}
 
 \end{frame}
 
