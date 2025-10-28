@@ -132,18 +132,18 @@ We assume we can evaluate $\mu(x)$, but we have no samples from $\pi$ and do not
 \end{frame}
 
 
-\begin{frame}[t]{Path Space Sampling}
+% \begin{frame}[t]{Path Space Sampling}
 
-    Minimizing the running and terminal costs between the optimal controlled process and the uncontrolled reference process.
+%     Minimizing the running and terminal costs between the optimal controlled process and the uncontrolled reference process.
 
-\begin{figure}
-    \centering
-    \includegraphics[width=0.8\textwidth]{figures/image_v3.png}
-\end{figure}
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{figures/image_v3.png}
+% \end{figure}
 
-\note{refaire cette illustration avec le controlled, uncontrolled et target (optimal controlled) processus }
+% \note{refaire cette illustration avec le controlled, uncontrolled et target (optimal controlled) processus }
 
-\end{frame}
+% \end{frame}
 
 
 \subsection{Stochastic Optimal Control}
@@ -178,13 +178,12 @@ Q^{\text{ref}}(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F^{\text{
 \]
 
 \[
-p^{\text{ref}}_n(x) = \mathcal{N}\left( x; \mu_0, \Sigma_0 + n h \sigma^2 I \right), \;\text{is closed form.}
+p^{\text{ref}}_n(x) = \mathcal{N}\left( x; x_0, \Sigma_0 + n h \sigma^2 I \right), \;\text{is closed form.}
 \]
 \end{column}
 \end{columns}
 
-\medskip
-\begin{block}{Goal.} Learn $f$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown.).
+\begin{block}{\scriptsize Goal.} Learn $f_\theta$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown.).
 \end{block}
 
 \note{Why closed form for uncontrolled but not controlled? The uncontrolled reference process has no drift, so each transition is a simple Gaussian convolution, leading to Gaussian marginals with closed-form means and variances $(e.g., p^{ref}_n(x) = N(x; mu_0, cov_0 + n h \sigma^2 I))$. The controlled process includes a learned drift $f(x_n, n)$, which makes transitions non-Gaussian and dependent on $f$, preventing a closed-form marginal expression without solving the integral numerically or via simulation.
@@ -197,58 +196,66 @@ p^{\text{ref}}_n(x) = \mathcal{N}\left( x; \mu_0, \Sigma_0 + n h \sigma^2 I \rig
 \begin{frame}{Closed Form of Reference Marginal}
 \footnotesize
 
-\textbf{Reference Process.}
+\textbf{Uncontrolled Sampling.}
 \[
-x_N = x_0 + \sqrt{h} \sigma \sum_{k=0}^{N-1} \varepsilon_k.
+x_N = x_0 + \sqrt{h} \sigma \sum_{k=0}^{N-1} \varepsilon \quad \varepsilon \sim \mathcal{N}(0, I) \quad \text{since we are using Brownian motion}.
 \]
 
-\textbf{Distribution of Terminal State.} Since the sum of independent Gaussians is Gaussian:
+\textbf{Inverse of the Reparametrization Trick.}
 \[
-x_N \sim \mathcal{N}(m_0, \Sigma_0 + N h \sigma^2 I).
+x_N \sim \mathcal{N}(x_0, \Sigma_0 + N h \sigma^2 I) \quad \text{where } \Sigma_0 \text{is the initial covariance.}
 \]
 
-\textbf{Terminal Marginal Density.}
+\textbf{Probability Density Function of Terminal Sample.}
 \[
-p^{\text{ref}}_N(x) = \frac{1}{(2\pi)^{D/2} |\Sigma_0 + N h \sigma^2 I|^{1/2}} \exp\left( -\frac{1}{2} (x - m_0)^\top (\Sigma_0 + N h \sigma^2 I)^{-1} (x - m_0) \right).
+p^{\text{ref}}_N(x_N) = \frac{1}{(2\pi)^{D/2} |\Sigma_0 + N h \sigma^2 I|^{1/2}} \exp\left( -\frac{1}{2} (x_N - x_0)^\top (\Sigma_0 + N h \sigma^2 I)^{-1} (x_N - x_0) \right).
 \]
 
 \end{frame}
 
 
+\begin{frame}{Guiding the Controlled Process}
+\footnotesize
 
-% \begin{frame}[t]{Target Path Measure via IS (Part 2)}
-% \footnotesize
+\textbf{Goal.} We want the terminal marginal of the controlled process to match the target distribution:
 
-% \textbf{What Each Term Does.}
-% \begin{itemize}\itemsep2pt
-%   \item \( Q^{\text{ref}}(x_{0:N}) \): The proposal path measure—provides the base trajectories (e.g., uncontrolled diffusion). It's the "easy" distribution we sample from.
-%   \item \( \pi(x_N) \): The target terminal density (normalized). It steers the paths toward high-probability endpoints under the true distribution.
-%   \item \( p^{\text{ref}}_N(x_N) \): The reference terminal marginal (known, e.g., Gaussian). It normalizes the weight so the reweighted measure integrates to 1 and corrects for the proposal's bias at the endpoint.
-% \end{itemize}
+\[
+P(x_N) = \pi(x_N), \quad \text{but to reach } x_N, \text{ we will need a trajectory that goes from } x_0 \text{ to } x_N
+\]
 
-% \textbf{Why This Achieves the Goal.} The weight \( w(x_{0:N}) \) adjusts the path probabilities so that trajectories ending in regions with high \( \mu(x_N) \) are favored, while those in low-\( \mu \) regions are penalized. This "importance resamples" the paths to match the target terminal distribution, without needing samples from \( \pi \).
+\medskip
 
-% \textbf{Connection to Girsanov Theorem.} This reweighting is formalized by the **Girsanov theorem** in stochastic calculus, which allows changing the drift of a diffusion process by reweighting the path measure with an exponential martingale. Here, the weight \( \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \) corresponds to the Radon-Nikodym derivative that shifts the process from the reference (zero-drift) to one with the desired terminal behavior. It's not just importance sampling—it's a rigorous change-of-measure for continuous-time processes, ensuring the reweighted paths are absolutely continuous and the terminal marginal is exact.
+\textbf{The problem.} How to define a path space distribution $P(\tau)$ such that:
 
-% \end{frame}
+% \[
+% P(x_N) = \text{process with a high weight on } \pi(x_N), \text{ knowing } \tau \text{ is sampled from the controlled process } Q
+% \]
 
-% --- Slide 2 ---
+\[
+P(x_N) = \int_{\text{subtrajectories}} \underbrace{Q^{\text{ref}}(x_{0:N-1} | x_N) \, dx_{0:N-1} \cdot p_N^{\text{ref}}(x_N)}_{Q^{\text{ref}}(x_{0:N})} \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)} = \pi(x_N).
+\]
+
+% \text{but since we need to guide the controlled process, we need a signal over the entire trajectory and not only over the terminal distribution otherwise this would be extremely difficult to train (extreme credit assignment)}
+\medskip
+
+Let's sample from a single trajectory at a time:
+
+\[
+P(\tau) = Q^{\text{ref}}(\tau) \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)} \propto Q^{\text{ref}}(\tau) \cdot \frac{\mu(x_N)}{p_N^{\text{ref}}(x_N)}.
+\]
+
+% \text{Thus,  \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)}$; finally, since we only have access to $\mu(x_N)$, $P(\tau) \propto \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)}$ and this entire process as a signal to guide to something proportional to $\mu(x_N)$.}
+
+\end{frame}
+
+
 \begin{frame}[t]{Path space KL objective}
 \scriptsize
-% \textbf{Elementary identity: P(A,B) = P(A$\mid$B) P(B)}
-% \[
-% P(x_{0:N}) = P(x_{0:N-1} | x_N) P(x_N).
-% \]
 
-% \textbf{Reference bridge decomposition.}
-% \[
-% Q^{\text{ref}}(x_{0:N}) \;=\; Q^{\text{ref}}(x_{0:N-1}\mid x_N)\; p_N^{\text{ref}}(x_N),
-% \qquad p_N^{\text{ref}}(x_N)=\!\int Q^{\text{ref}}(x_{0:N})\,dx_{0:N-1}.
-% \]
 
 \textbf{Target path measure via terminal reweighting.}
 \[
-P(x_{0:N}) \;\propto\; Q^{\text{ref}}(x_{0:N-1} | x_N) \mu(x_N) \;\propto\ Q^{\text{ref}}(x_{0:N})\,\frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)}
+P(x_{0:N})\propto\ Q^{\text{ref}}(x_{0:N})\,\frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)}
 \qquad\Longrightarrow\qquad P(x_N)\propto\mu(x_N).
 \]
 
