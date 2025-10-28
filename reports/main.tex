@@ -44,7 +44,7 @@
 %    TITLE PAGE
 %----------------------------------------------------------------------------------------
 
-\title{Diffusion Generative Flow Samplers: Improving Learning Signals Through Partial Trajectory Optimization}
+\title{Diffusion Generative Flow Samplers: Improving Learning Signals Through Partial Trajectory Optimization (ICLR 2024)}
 
 \subtitle{Dinghuai Zhang*, Ricky T. Q. Chen, Cheng-Hao Liu, Aaron Courville \& Yoshua Bengio}
 \author{Thomas Mousseau} 
@@ -75,7 +75,7 @@
 
 %------------------------------------------------
 
-\section{Introduction}
+\section{Introduction and Motivation}
 
 \subsection{Problem Statement}
 
@@ -131,32 +131,14 @@ We assume we can evaluate $\mu(x)$, but we have no samples from $\pi$ and do not
 
 \end{frame}
 
-\begin{frame}[t]{Diffusion Generative Flow Samplers}
-\footnotesize
-\textbf{Idea.} We will \emph{reframe sampling} from an unnormalized target $\pi(x)\propto \mu(x)$ as a \emph{stochastic optimal control (SOC)} problem. This means learning a control function that steers a diffusion process so its \emph{terminal marginal} matches $\pi$.
 
-\medskip
-\textbf{Why this helps.}
-\begin{itemize}\itemsep2pt
-  \item Gives a \emph{path-space} training objective/metric: a KL on trajectories $\mathrm{KL}(Q\,\|\,P)$ where $P$ is the reference paths reweighted by $\mu(x_T)$.
-  \item The \emph{partition function $Z$ cancels} inside this objective, so we can train using only $\mu$ (and optionally $\nabla\log\mu$).
-  \item Lets us optimize \emph{without samples from $\pi$} and still measure closeness to the true normalized endpoint.
-\end{itemize}
-
-\medskip
-\textbf{Caveat (sets up DGFS).} This path-KL places supervision \emph{only at the terminal time} $\Rightarrow$ poor \emph{credit assignment} and high-variance gradients.
-
-\medskip
-\textbf{DGFS fix (preview).} Inject \emph{intermediate} learning signals via a GFlowNet-inspired \emph{learned flow} and \emph{subtrajectory balance}, enabling partial-trajectory training and more stable learning.
-\end{frame}
-
-\begin{frame}[t]{Diffusion Generative Flow Samplers v2}
+\begin{frame}[t]{Path Space Sampling}
 
     Minimizing the running and terminal costs between the optimal controlled process and the uncontrolled reference process.
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.6\textwidth]{figures/image.png}
+    \includegraphics[width=0.8\textwidth]{figures/image_v3.png}
 \end{figure}
 
 \note{refaire cette illustration avec le controlled, uncontrolled et target (optimal controlled) processus }
@@ -165,19 +147,27 @@ We assume we can evaluate $\mu(x)$, but we have no samples from $\pi$ and do not
 
 
 \subsection{Stochastic Optimal Control}
-
 \begin{frame}[t]{Controlled and Reference Processes}
+
 \scriptsize
+
+\begin{columns}[t]
+\begin{column}{0.48\textwidth}
 \textbf{Controlled forward transition (learned drift).}
 \[
 P_F(x_{n+1}\mid x_n)\;=\;\mathcal N\!\big(x_{n+1};\;x_n + h\,f_\theta(x_n,n),\;h\sigma^2 I\big)
 \]
-\textbf{Controlled process.}
+\textbf{Controlled process and marginals.}
 \[
 Q(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F(x_{n+1}\mid x_n)
 \]
 
-\medskip
+\[
+p_n(x) = \int Q(x_{0:N})\,dx_{0:n-1}dx_{n+1:N}, \;\text{no closed form.}
+\]
+
+\end{column}
+\begin{column}{0.48\textwidth}
 \textbf{Uncontrolled/Reference forward transition (zero drift).}
 \[
 P_F^{\text{ref}}(x_{n+1}\mid x_n)\;=\;\mathcal N\!\big(x_{n+1};\;x_n,\;h\sigma^2 I\big)
@@ -190,15 +180,17 @@ Q^{\text{ref}}(x_{0:N})\;=\;p^{\text{ref}}_0(x_0)\;\prod_{n=0}^{N-1} P_F^{\text{
 \[
 p^{\text{ref}}_n(x) = \mathcal{N}\left( x; \mu_0, \Sigma_0 + n h \sigma^2 I \right), \;\text{is closed form.}
 \]
+\end{column}
+\end{columns}
 
 \medskip
-\textbf{Goal.} Learn $f$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown.).
+\begin{block}{Goal.} Learn $f$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown.).
+\end{block}
 
 \note{Why closed form for uncontrolled but not controlled? The uncontrolled reference process has no drift, so each transition is a simple Gaussian convolution, leading to Gaussian marginals with closed-form means and variances $(e.g., p^{ref}_n(x) = N(x; mu_0, cov_0 + n h \sigma^2 I))$. The controlled process includes a learned drift $f(x_n, n)$, which makes transitions non-Gaussian and dependent on $f$, preventing a closed-form marginal expression without solving the integral numerically or via simulation.
 
 
-\textcolor{red}{je dois refaire cette slide, on ne voit meme comment xn est sample (par rapport a la SDE) et aussi d'ou sort sigma mu et la closed form expliquer et c'est une convolution de gaussienne}
-}
+\textcolor{red}{je dois refaire cette slide, on ne voit meme comment xn est sample (par rapport a la SDE) et aussi d'ou sort sigma mu et la closed form expliquer et c'est une convolution de gaussienne}}
 
 \end{frame}
 
@@ -285,115 +277,47 @@ P(x_{0:N}) \;\propto\; Q^{\text{ref}}(x_{0:N-1} | x_N) \mu(x_N) \;\propto\ Q^{\t
 \note{ \textcolor{red}{Je devrais avoir une slide complete a explier d'ou vient le foward target process $P$ parce que c'est le coeur de mon algorithme} }
 \end{frame}
 
-\begin{frame}[t]{Target Path Measure via Importance Sampling}
-\footnotesize
+% \begin{frame}[t]{Target Path Measure via Importance Sampling}
+% \footnotesize
 
-\textbf{Importance Sampling Basics.} Importance sampling is a technique to estimate expectations under a hard-to-sample target distribution \( P \) using samples from an easy-to-sample proposal distribution \( Q \). The key formula is:
-\[
-\mathbb{E}_{x \sim Q} \left[ f(x) \cdot w(x) \right] = \mathbb{E}_{x \sim P} [f(x)],
-\]
-where the \textcolor{red}{\emph{importance weight} \( w(x) = \frac{P(x)}{Q(x)} \)} corrects the samples from \( Q \) to behave as if they were from \( P \).
-
-\textbf{Intuition.} \( Q \) provides "biased" samples; \( w(x) \) upweights samples that are likely under \( P \) and downweights those that aren't, effectively resampling from \( P \) without directly sampling it.
-
-\textbf{Application to Path Measures.} In our case, the "samples" are entire trajectories \( x_{0:N} \), and we want the path measure \( P \) to have the correct terminal marginal \( \pi(x_N) \propto \mu(x_N) \). We use the reference path measure \( Q^{\text{ref}} \) (easy to sample, e.g., Gaussian paths) as the proposal. The reweighted path measure is:
-\[
-P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \cdot w(x_{0:N}),
-\]
-where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This ensures \( P(x_N) \propto \mu(x_N) \), as the weight depends only on the endpoint.
-
-\end{frame}
-
-%!Diffusion Denoising Score Matching slides removed for brevity 
-% \begin{frame}[t]{Diffusion Process}
-% \scriptsize
-
-% \textbf{Idea.} Let the target “diffuse to Gaussian” via a reference process (VP/VE SDE). The \emph{reverse-time} dynamics can, in principle, generate target samples if we know the \emph{score} $\nabla_x \log p_t(x)$:
+% \textbf{Importance Sampling Basics.} Importance sampling is a technique to estimate expectations under a hard-to-sample target distribution \( P \) using samples from an easy-to-sample proposal distribution \( Q \). The key formula is:
 % \[
-% \underbrace{dx_t=\sigma\,dW_t}_{\text{forward/noising}}
-% \quad\Longleftrightarrow\quad
-% \underbrace{dx_t=\big[f_{\text{ref}}(x,t)-\sigma^2\nabla_x \log p_t(x)\big]dt+\sigma\,d\bar W_t}_{\text{reverse/generative}}.
+% \mathbb{E}_{x \sim Q} \left[ f(x) \cdot w(x) \right] = \mathbb{E}_{x \sim P} [f(x)],
 % \]
+% where the \textcolor{red}{\emph{importance weight} \( w(x) = \frac{P(x)}{Q(x)} \)} corrects the samples from \( Q \) to behave as if they were from \( P \).
 
-% \textbf{What is score matching?} 
-% Learn a network $s_\theta(x,t)\approx \nabla_x\log p_t(x)$ by regressing on \emph{noised data}:
+% \textbf{Intuition.} \( Q \) provides "biased" samples; \( w(x) \) upweights samples that are likely under \( P \) and downweights those that aren't, effectively resampling from \( P \) without directly sampling it.
+
+% \textbf{Application to Path Measures.} In our case, the "samples" are entire trajectories \( x_{0:N} \), and we want the path measure \( P \) to have the correct terminal marginal \( \pi(x_N) \propto \mu(x_N) \). We use the reference path measure \( Q^{\text{ref}} \) (easy to sample, e.g., Gaussian paths) as the proposal. The reweighted path measure is:
 % \[
-% \min_\theta\ \mathbb E_{t}\,\mathbb E_{x_0\sim p_{\text{data}}}\,\mathbb E_{\varepsilon}\!
-% \big\|s_\theta(x_t,t)-\nabla_x\log p_t(x_t)\big\|^2,
+% P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \cdot w(x_{0:N}),
 % \]
-% which is equivalent to denoising a corrupted sample $x_t$ back toward $x_0$.
-
-% \vspace{0.1cm}
-% \begin{errorblock}{Why Denoising Score Matching is \emph{not} applicable here}
-% \begin{itemize}\itemsep2pt
-%   \item We have \emph{no dataset} from $\pi$, only the unnormalized $\mu(x)$ (and maybe $\nabla\log\mu$).
-
-% \end{itemize}
-% \end{errorblock}
+% where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This ensures \( P(x_N) \propto \mu(x_N) \), as the weight depends only on the endpoint.
 
 % \end{frame}
-% \begin{frame}[t]{Alternative to DSM: learn the vector field (control)}
-% \scriptsize
-% \textbf{Reverse SDE drift (generative side).}
-% \[
-% dx_t=\big[f_{\text{ref}}(x,t)-\sigma^2\,\nabla_x \log p_t(x)\big]\,dt+\sigma\,d\bar W_t.
-% \]
-
-% \textbf{DSM route (data world).} Learn the \emph{score} $s_\theta(x,t)\approx\nabla_x\log p_t(x)$ from noised \emph{data}, then plug it into the reverse drift.
-
-% \textbf{Vector-field route (our setting).} Directly learn the \emph{control/drift} $u_\theta(x,t)$ instead of the score. The two are \emph{equivalent} via:
-% \[
-% u_\theta(x,t)\;=\;f_{\text{ref}}(x,t)\;-\;\sigma^2\,s_\theta(x,t)
-% \quad\Longleftrightarrow\quad
-% s_\theta(x,t)\;=\;\tfrac{f_{\text{ref}}(x,t)-u_\theta(x,t)}{\sigma^2}.
-% \]
-
-% \textbf{Why do this here?}
-% \begin{itemize}\itemsep2pt
-%   \item We have no dataset from $\pi$, so DSM can’t form expectations over $p_t$; scores $\nabla\log p_t$ are unavailable.
-%   \item Instead, treat $u_\theta$ as a \emph{control} and \emph{learn it} by minimizing a $Z$-free \textit{path-space} KL that uses only the given $\mu(\cdot)$.
-%   \item This sets up diffusion samplers à la PIS/DDS and enables DGFS’s improvements (intermediate, subtrajectory credit).
-% \end{itemize}
-
-% \textbf{Notation tip.} Use $u_\theta$ (or $f$) for the vector field to avoid clashing with $\mu(\cdot)$, which denotes the unnormalized density.
-% \end{frame}
-
-
 
 %------------------------------------------------
-\section{Stochastic Optimal Control to GFlowNets}
+\section{Method}
 
-\subsection{Credit Assignment Problem in SOC}
+\subsection{Solving Credit Assignment Problem}
 
 \begin{frame}[t]{Credit Assignment Problem in SOC objective}
 \footnotesize
+
+\vspace{0.8cm}
+
 \begin{errorblock}{SOC Discrete-time objective}
 \[
 \min_{f_\theta}\ \mathbb E_Q\!\Big[\underbrace{\sum_{n=0}^{N-1}\tfrac{h}{2\sigma^2}\|f_\theta(x_n,n)\|^2}_{\text{Running cost}}\;+\;\underbrace{\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)}_{\text{Terminal cost}}\Big]
 \]
 
-This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusion-based Sampling for Unnormalized Densities} \cite{zhang2022} et al which presented the sampling from unnormalized densities as a stochastic optimal control problem.
+This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusion-based Sampling for Unnormalized Densities} \cite{zhang2022} which presented the sampling from unnormalized densities as a stochastic optimal control problem.
 
 \end{errorblock}
 
-\textbf{Explanation.} The SOC objective provides feedback signal only at the terminal step, making credit assignment difficult via backpropagation through time. This causes high-variance gradients, weak feedback for early actions, poor mode discovery, and inefficient optimization of the drift $f$ without intermediate signals.
+% \textbf{Explanation.} The SOC objective provides feedback signal only at the terminal step, making credit assignment difficult via backpropagation through time. This causes high-variance gradients, weak feedback for early actions, poor mode discovery, and inefficient optimization of the drift $f$ without intermediate signals.
 
 \end{frame}
-
-% \begin{frame}{GFlowNet's perspective on DGFS}
-% \footnotesize
-
-% \textbf{Recap of GFlowNets.} GFlowNets learn to sample from unnormalized distributions by modeling flows on a DAG.
-
-% \begin{itemize}\itemsep2pt
-%   \item \textbf{DAG Structure:} Define a DAG $G = (S, A)$ with states $S$ and directed edges $s \to s' \in A$.
-%   \item \textbf{Trajectories:} Complete trajectories $\tau = s_0 \to s_1 \to \dots \to s_T$ from start to terminal states.
-%   \item \textbf{Forward Policy:} $P_F(s' | s)$, the probability of transitioning from $s$ to $s'$.
-%   \item \textbf{Terminal Marginal:} $P_T(x) = \sum_{\tau \text{ ending at } x} P_F(\tau)$, the marginal over terminating states.
-%   \item \textbf{Goal:} Learn $P_F$ such that $P_T(x) \propto R(x)$, where $R(x)$ is the unnormalized reward/density, and $Z = \sum_x R(x)$.
-% \end{itemize}
-
-% \end{frame}
 
 \begin{frame}[t]{SOC as a GFlowNet}
 \footnotesize
@@ -417,7 +341,7 @@ This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusi
 \end{tabular}
 \end{table}
 
-\textbf{Insight.} Since SOC can be viewed as a GFlowNet, we can apply GFlowNet tools (e.g., detailed balance loss, subtrajectory balance) to solve the credit assignment problem.
+\textbf{Insight.} Since SOC can be viewed as a GFlowNet, we can apply GFlowNet tools (detailed balance loss or subtrajectory balance) to solve the credit assignment problem.
 
 \note{make a mental note to comeback to professor hernandez comment on Tristan's Deleu presentation when someone asked: "The if GFlowNets are just Reinfrocement Learning, then why keep doing research on this framework?" Professor Hernandez reponded by proving the felxibility of GFN, he said that it was en entery point between RL, Diffusion models, Energy-based models and in this case we prove that it can also be used in Stochastic Optimal Control problems.}
 
@@ -513,35 +437,42 @@ P(x_{0:n}) = p_n(x_n) \prod_{k=0}^{n-1} Q^\text{ref}_B(x_k | x_{k+1}),
 
 \textbf{But There's No Closed Form for $p_n(x_n)$.} To calculate $p_n(x_n)$, we would need to compute the integral:
 \[
-p_n(x_n) = \int \pi(x_N) \prod_{n}^{N-1} Q^\text{ref}_B(x_n | x_{n+1}) \, dx_{n+1:N}.
+p_n(x_n) = \int_{\mathbb{R}^{(N-n)D}} \pi(x_N) \prod_{k=n}^{N-1} Q^\text{ref}_B(x_k | x_{k+1}) \, dx_{n+1:N}.
 \]
 
 \[
-p_n(x_n) \propto \int_{\mathbb{R}^{(N-n)D}} \mu(x_N) \prod_{k=n}^{N-1} Q^{\text{ref}}B(x_k | x_{k+1}) , dx_{n+1:N}.
+p_n(x_n) \propto \int_{\mathbb{R}^{(N-n)D}} \mu(x_N) \prod_{k=n}^{N-1} Q^{\text{ref}}_B(x_k | x_{k+1}) \, dx_{n+1:N}.
 \]
 
-\textbf{Why is $p_n(x_n)$ hard to compute?} The integral represents summing over all possible future paths from $x_n$ to the terminal $x_N$, weighting each by the terminal density $\pi(x_N)$. This high-dimensional integration (over $(N-n)\times D$ dimensions) has no analytical solution for general $\mu(x_N)$. Numerically approximating it via quadratures or Monte Carlo is computationally expensive, especially since training requires computing it repeatedly for subtrajectories as intermediate signals (replacing the single terminal signal), making it impractical.
+\vspace{-0.2cm}
+
+\begin{errorblock}{\scriptsize Why is $p_n(x_n)$ hard to compute?}
+\scriptsize To calculate this this high-dimensional integral (from $n$ to $N$ over $D$ dimensions), we would need a solution like Monte Carlo quadratures which would be infeasible in practice, especially since training requires computing it repeatedly for subtrajectories as intermediate signals.
+
+\end{errorblock}
+
+% \textbf{Why is $p_n(x_n)$ hard to compute?} The integral represents summing over all possible future paths from $x_n$ to the terminal $x_N$, weighting each by the terminal density $\pi(x_N)$. This high-dimensional integration (over $(N-n)\times D$ dimensions) has no analytical solution for general $\mu(x_N)$. Numerically approximating it via quadratures or Monte Carlo is computationally expensive, especially since training requires computing it repeatedly for subtrajectories as intermediate signals (replacing the single terminal signal), making it impractical.
 
 \note{ne pas oublier de parler des MC quadrature method pour approximer l'integral mais c'est couteux en temps de calcul et pas scalable du tout}
 
 \end{frame}
 
-\begin{frame}[t]{Trajectory Balance with Learned Flow}
-\footnotesize
+% \begin{frame}[t]{PartialTrajectory Balance with Learned Flow}
+% \footnotesize
 
-\textbf{Proposed Amortized Approach.} Train $F_n(\cdot; \phi)$, a neural network, to satisfy the following constraint for all partial trajectories $x_{n:N}$:
-\[
-F_n(x_n; \phi) \prod_{k=n}^{N-1} P_F(x_{k+1} | x_k; \theta) = \mu(x_N) \prod_{k=n}^{N-1} P_B(x_k | x_{k+1}).
-\]
+% \textbf{Proposed Amortized Approach.} Train $F_n(\cdot; \phi)$, a neural network, to satisfy the following constraint for all partial trajectories $x_{n:N}$:
+% \[
+% F_n(x_n; \phi) \prod_{k=n}^{N-1} P_F(x_{k+1} | x_k; \theta) = \mu(x_N) \prod_{k=n}^{N-1} P_B(x_k | x_{k+1}).
+% \]
 
-\textbf{Details.}
-\begin{itemize}\itemsep2pt
-  \item $P_F$ (forward policy) and $F_n$ are parameterized by deep neural networks, with parameters $\theta$ and $\phi$ respectively.
-  \item We can view $F_n$ as an approximation to the unknown marginal $p_n(x_n)$ thus an amortized way to estimate the intractable integral.
-  \item We use only $\mu(\cdot)$ (no $Z$), so the unknown normalization is absorbed into $F_n$.
-  \item Very similar to a Value Function in RL, estimating future expected rewards (here, future density mass).
-\end{itemize}
-\end{frame}
+% \textbf{Details.}
+% \begin{itemize}\itemsep2pt
+%   \item $P_F$ (forward policy) and $F_n$ are parameterized by deep neural networks, with parameters $\theta$ and $\phi$ respectively.
+%   \item We can view $F_n$ as an approximation to the unknown marginal $p_n(x_n)$ thus an amortized way to estimate the intractable integral.
+%   \item We use only $\mu(\cdot)$ (no $Z$), so the unknown normalization is absorbed into $F_n$.
+%   \item Very similar to a Value Function in RL, estimating future expected rewards (here, future density mass).
+% \end{itemize}
+% \end{frame}
 
 \begin{frame}[t]{Detailed and SubTB Balance with Learned Flow}
 \footnotesize
@@ -630,9 +561,9 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 
 
 %------------------------------------------------
-\section{Diffusion Generative Flow Sampler Results}
+\section{Results}
 
-\subsection{Gradients variance, $Z$ estimation and mode coverage}
+\subsection{Comparaing with Prior Methods}
 
 \begin{frame}[t]{Reduction of gradient variance}
 \footnotesize
@@ -670,19 +601,18 @@ with only full paths}
 \begin{frame}[t]{Accurate partition function $Z$ estimation}
 \footnotesize
 
-\textbf{How to Estimate $Z$.} The partition function $Z = \int \mu(x) \, dx$ normalizes the density. Since we sample trajectories from the learned process $Q$, we estimate $Z$ using importance sampling on the terminal states.
+\vspace{1.2cm}
 
-\textbf{Log-partition function estimator:}
+\begin{block}{Partition Function Estimation}
 \[
-\log \sum_{b=1}^B \exp(S(\tau^{(b)}; \theta)) - \log B \leq \log Z, \quad \tau^{(b)} \sim Q(\cdot; \theta).
+\log \sum_{\tau}^\mathrm{T} \exp(\log(P(\tau)) - \log(Q(\tau))) - \log \mathrm{T} \leq \log Z, \quad \tau \sim Q(\cdot; \theta).
 \]
 
-\textbf{Intuition (Simple).}
-\begin{itemize}\itemsep2pt
-  \item $S(\tau; \theta)$: Weight showing how well the trajectory matches the target (higher if it ends in high-$\mu$ regions).
-  \item Sample many trajectories from $Q$, compute their weights, and average in log space.
-  \item This gives a lower bound on $\log Z$ because $Q$ approximates the target, providing an estimate without direct $\pi$ samples.
-\end{itemize}
+The log-sum-exp trick is used as a smooth approximation to the maximum, providing a lower bound on $\log Z$. 
+
+\end{block}
+
+
 
 \end{frame}
 
@@ -697,20 +627,18 @@ with only full paths}
 
 \end{frame}
 
-\subsection{Convergence Guarantees}
+% \begin{frame}[t]{Convergence Guarantees}
+% \footnotesize
 
-\begin{frame}[t]{Convergence Guarantees}
-\footnotesize
+% \textbf{Convergence Guarantees for DGFS.}
+% \begin{itemize}\itemsep2pt
+%   \item Previous studies \cite{bortoli2022,chen2022,lee2022} show that the terminal sample distribution of a diffusion model converges to the target under mild assumptions if the control term is well learned. These apply to DGFS since proofs are independent of training method.
+%   \item \cite{zhang2022a} prove that a perfectly learned score corresponds to zero GFlowNet training loss \cite{bengio2021,bengio2023}, ensuring a well-trained DGFS accurately samples from the target distribution.
+% \end{itemize}
 
-\textbf{Convergence Guarantees for DGFS.}
-\begin{itemize}\itemsep2pt
-  \item Previous studies \cite{bortoli2022,chen2022,lee2022} show that the terminal sample distribution of a diffusion model converges to the target under mild assumptions if the control term is well learned. These apply to DGFS since proofs are independent of training method.
-  \item \cite{zhang2022a} prove that a perfectly learned score corresponds to zero GFlowNet training loss \cite{bengio2021,bengio2023}, ensuring a well-trained DGFS accurately samples from the target distribution.
-\end{itemize}
+% \note{Le but de montrer cette slide de garanties de convergences est pour prouver que malgrer les examples simples MoG, Manywell, etc (doivent etre simple pour avoir acces a la partition function Z, on peut garantir que DGFS va converger vers la bonne distribution cible pour des targets plus complexes.)}
 
-\note{Le but de montrer cette slide de garanties de convergences est pour prouver que malgrer les examples simples MoG, Manywell, etc (doivent etre simple pour avoir acces a la partition function Z, on peut garantir que DGFS va converger vers la bonne distribution cible pour des targets plus complexes.)}
-
-\end{frame}
+% \end{frame}
 
 \begin{frame}[t]{Mode coverage results}
 
@@ -733,23 +661,7 @@ with only full paths}
     
 \end{frame}
 
-% \begin{frame}[t]{Off-policy training capability (a voir si on garde cette slide)}
-% \footnotesize
-
-% \textbf{Off-Policy Training in DGFS.} Unlike previous KL-based methods restricted to on-policy training (high-variance off-policy via importance sampling), DGFS supports off-policy exploration without it, as its objectives (Eq. 9/14) don't require samples from a specific distribution \cite{malkin2023,lahlou2023}.
-
-% \textbf{Exploration Strategy.} Use a larger variance coefficient \(\tilde{\sigma} > \sigma\) in the forward process during rollouts to capture diverse modes, improving multimodal sampling.
-
-% \textbf{Example: MoG+ Task.} With distant modes, setting \(\tilde{\sigma} = 2\) (vs. \(\sigma = 1\)) achieves better mode coverage and lower Z estimation bias.
-
-% \textbf{DGFS+ Experiment.} Linearly anneal \(\tilde{\sigma}\) from 1.1 to 1 over first 1000 steps, enhancing performance in some scenarios as a tunable hyperparameter.
-
-% \end{frame}
-
-
-
-%------------------------------------------------
-\section{Conclusion}
+\subsection{Strengths and Weaknesses}
 
 \begin{frame}{Strengths of DGFS}
 \footnotesize
@@ -783,12 +695,26 @@ with only full paths}
 
 \end{frame}
 
-\subsection{Final Thoughts and Future Work}
+%------------------------------------------------
+\section{Conclusion}
+
+\subsection{Opinionated Thoughts and Future Work}
 \begin{frame}{Personal Opinion on this work}
 \footnotesize
 
- This paper addresses a clear problem with path-space samplers, which is that both PIS and DDS required full trajectory signals to learn. By introducing subtrajectory signals from the GFlowNet framework, they were definitely able to reduce the credit assignment problem. Before being able to use any of these path samplers in settings where we only have the unnormalized density function, mainly in chemistry and physics, we will need much better mode coverage since these unnormalized densities are highly multidimensional. The difficult benchmarks have shown that we are not there yet, but there is still a lot of work to do on mode discovery and sample efficiency in order to use these models in real-life applications.
+\begin{block}{Summary of Contributions}
+\begin{itemize}\itemsep2pt
+  \item Addresses a key issue in path-space samplers: PIS and DDS needed full trajectory signals for learning.
+  \item Introduces subtrajectory signals from GFlowNet to reduce the credit assignment problem.
+\end{itemize}
+\end{block}
 
+\begin{errorblock}{Future Challenges}
+\begin{itemize}\itemsep2pt
+  \item For real-world applications (chemistry and physics) with unnormalized densities, better mode coverage is essential due to high dimensionality.
+  \item Current benchmarks show progress, but more work is needed on mode discovery and sample efficiency.
+\end{itemize}
+\end{errorblock}
 
 \end{frame}
 
