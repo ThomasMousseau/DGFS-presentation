@@ -3,7 +3,7 @@
 %----------------------------------------------------------------------------------------
 
 \documentclass[aspectratio=169,xcolor=dvipsnames]{beamer}
-\setbeameroption{show notes} %TODO: Thomas a enlever avant la presentation
+% \setbeameroption{show notes} %TODO: Thomas a enlever avant la presentation
 \usetheme{SimplePlus}
 
 \useoutertheme{miniframes}  % Adds horizontal navigation dots at the top for subsections
@@ -210,11 +210,19 @@ p^{\text{ref}}_N(x_N) = \frac{1}{(2\pi)^{D/2} |\Sigma_0 + N h \sigma^2 I|^{1/2}}
 \begin{frame}{Guiding the Controlled Process}
 \footnotesize
 
-\textbf{Goal.} We want the terminal marginal of the controlled process to match the target distribution:
+\begin{block}{\footnotesize Adding Terminal Tilt to the Uncontrolled $Q^{\text{ref}}$ Process to Create the Target Process $P$}
 
 \[
-P(x_N) = \pi(x_N), \quad \text{but to reach } x_N, \text{ we will need a trajectory that goes from } x_0 \text{ to } x_N
+P(\tau) = Q^{\text{ref}}(x_{0:N-1} | x_N) \cdot \pi(x_N) = Q^{\text{ref}}(\tau) \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)} \propto Q^{\text{ref}}(\tau) \cdot \frac{\mu(x_N)}{p_N^{\text{ref}}(x_N)}.
 \]
+    
+\end{block}
+
+% \textbf{Goal.} We want the terminal marginal of the controlled process to match the target distribution:
+
+% \[
+% P(x_N) = \pi(x_N), \quad \text{but to reach } x_N, \text{ we will need a trajectory that goes from } x_0 \text{ to } x_N
+% \]
 
 \medskip
 
@@ -223,13 +231,11 @@ P(x_N) = \pi(x_N), \quad \text{but to reach } x_N, \text{ we will need a traject
 P(x_N) = \int_{\text{subtrajectories}} \underbrace{Q^{\text{ref}}(x_{0:N-1} | x_N) \, dx_{0:N-1} \cdot p_N^{\text{ref}}(x_N)}_{Q^{\text{ref}}(x_{0:N})} \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)} = \pi(x_N).
 \]
 
-\medskip
+% \medskip
 
-By adding a terminal tilt, the target process $P(\tau)$ biases every step of the trajectory towards regions where $\pi(x_N)$ is high:
+% By adding a terminal tilt, the target process $P(\tau)$ biases every step of the trajectory towards regions where $\pi(x_N)$ is high:
 
-\[
-P(\tau) = Q^{\text{ref}}(x_{0:N-1} | x_N) \cdot \pi(x_N) = Q^{\text{ref}}(\tau) \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)} \propto Q^{\text{ref}}(\tau) \cdot \frac{\mu(x_N)}{p_N^{\text{ref}}(x_N)}.
-\]
+
 
 
 \end{frame}
@@ -305,7 +311,7 @@ This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusi
 \textbf{Concept} & \textbf{GFlowNet} & \textbf{SOC} \\
 \midrule
 \textbf{Forward Process} & Trajectory sampling on DAG & Controlled diffusion path \\
-\textbf{Forward Transition Probability} & $P_F(s' | s)$ & $P_F(x_{n+1} | x_n) = \mathcal{N}(x_{n+1}; x_n + h f(x_n), h\sigma^2 I)$ \\
+\textbf{Forward Transition Probability} & $P_F(s' | s)$ & $P_F(x_{n+1} | x_n) = \mathcal{N}(x_{n+1}; x_n + h f_\theta(x_n), h\sigma^2 I)$ \\
 \textbf{Backward Transition Probability} & $P_B(s | s')$ & $P_B^{\text{ref}}(x_n | x_{n+1})$ (known) \\
 \textbf{Reward Function} & $R(x)$ (unnormalized) & $\mu(x)$ (unnormalized density) \\
 \textbf{Terminal Marginal Distribution} & $P_T(x) \propto R(x)$ & $Q(x_N) \propto \mu(x_N)$ \\
@@ -500,7 +506,7 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 \begin{itemize}\itemsep2pt
   \item $\tau$: Full trajectory $(x_0, \dots, x_N)$.
   \item $\lambda$: $(0, 1]$ to weight shorter subtrajectories more since they have lower variance.
-  \item The denominator normalizes to average the losses
+  \item The denominator stabilizes the loss scale across different trajectory lengths.
 \end{itemize}
 
 \end{errorblock}
@@ -511,7 +517,7 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 \begin{frame}[t,fragile]{}
 \footnotesize  
 
-\vspace{-0.2cm}
+\vspace{-0.35cm}
 
 \begin{algorithm}[H]
     \footnotesize
@@ -523,12 +529,12 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 \Repeat
     \State Sample trajectories:
     \For{$b=1$ to $B$}
-        \State $\tau^{(b)}=(x^{(b)}_0,\ldots,x^{(b)}_N)$ under $x_{n+1}=x_n+h f_{\theta_f}(x_n,n)+\sqrt{h}\bar{\sigma}\varepsilon_n$, $\varepsilon_n\sim\mathcal N(0,I)$
+        \State $\tau^{(b)}=(x^{(b)}_0,\ldots,x^{(b)}_N)$ under $x_{n+1}=x_n+h f_{\theta}(x_n,n)+\sqrt{h}\bar{\sigma}\varepsilon_n$, $\varepsilon_n\sim\mathcal N(0,I)$
     \EndFor
     \State Build subtrajectories: $\mathcal S(\tau^{(b)})$ of $(m,n)$ with $0\le m<n\le N$
     \State Compute SubTB loss:
     \begin{equation*}
-    \mathcal L(\tau^{(b)};\theta)=\sum_{(m,n)\in\mathcal S(\tau^{(b)})}\lambda^{n-m}\left[\log\frac{F_\phi(x_m)\prod_{l=m}^{n-1} P_F(x_{l+1}\mid x_l;\theta_f)}{F_\phi(x_n)\prod_{l=m}^{n-1} P_B^{\mathrm{ref}}(x_l\mid x_{l+1})}\right]^2
+\mathcal L(\tau^{(b)};\theta)=\frac{\sum_{(m,n)\in\mathcal S(\tau^{(b)})}\lambda^{n-m}\left[\log\frac{F_\phi(x_m)\prod_{l=m}^{n-1} P_F(x_{l+1}\mid x_l;\theta_f)}{F_\phi(x_n)\prod_{l=m}^{n-1} P_B^{\mathrm{ref}}(x_l\mid x_{l+1})}\right]^2}{\sum_{(m,n)\in\mathcal S(\tau^{(b)})}\lambda^{n-m}}
     \end{equation*}
     \State $g \leftarrow \nabla_{\theta}\frac{1}{B}\sum_{b=1}^B \mathcal L(\tau^{(b)};\theta)$
     \State $\theta \leftarrow \mathrm{Adam}(\theta, g, \eta)$
@@ -543,32 +549,23 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 
 \subsection{Comparaing with Prior Methods}
 
-\begin{frame}[t]{Reduction of gradient variance}
+\begin{frame}[t]{Reduction of Gradient Variance}
 \footnotesize
 
 \vspace{-0.75cm}
 \begin{columns}[t]
-\begin{column}{0.33\textwidth}
+\begin{column}{0.35\textwidth}
 \begin{figure}
     \centering
     \includegraphics[width=\textwidth]{figures/grad_variance.png}
     \caption{Gradient variance comparison between DGFS and PIS. DGFS shows significantly lower variance, leading to more stable training.}
 \end{figure}
 \end{column}
-\begin{column}{0.33\textwidth}
+\begin{column}{0.35\textwidth}
 \begin{figure}
     \centering
     \includegraphics[width=\textwidth]{figures/drift.png}
     \caption{Drift network magnitude of DGFS and PIS.}
-\end{figure}
-\end{column}
-\begin{column}{0.33\textwidth}
-\begin{figure}
-    \centering
-    \includegraphics[width=\textwidth]{figures/grad_variance_2.png}
-    \caption{Gradient variance of
-DGFS, PIS, and DGFS trained
-with only full paths}
 \end{figure}
 \end{column}
 \end{columns}
@@ -576,47 +573,32 @@ with only full paths}
 \end{frame}
 
 
-\begin{frame}[t]{Accurate partition function $Z$ estimation}
+\begin{frame}[t]{Partition Function Estimation}
 \footnotesize
 
 \vspace{1.2cm}
 
 \begin{block}{Partition Function Estimation}
 \[
-\log \sum_{\tau}^\mathrm{T} \exp(\log(P(\tau)) - \log(Q(\tau))) - \log \mathrm{T} \leq \log Z, \quad \tau \sim Q(\cdot; \theta).
+\log \sum_{\tau}^\mathrm{B} \exp(\log(P(\tau)) - \log(Q(\tau))) - \log \mathrm{B} \leq \log Z, \quad \tau \sim Q(\cdot; \theta).
 \]
 
-The log-sum-exp trick is used as a smooth approximation to the maximum, providing a lower bound on $\log Z$. 
+The equation computes a lower bound on $\log Z$ via importance sampling: it samples trajectories $\tau$ from $Q$, reweights them by $\log(P(\tau)/Q(\tau))$, and uses log-sum-exp to approximate $\log$ of the normalized weight sum, which underestimates $\log Z$ due to Jensen's inequality.
 
 \end{block}
 
-
-
 \end{frame}
 
-\begin{frame}[t]{Partition function estimation results}
+\begin{frame}[t]{Partition Function Estimation Results}
 \footnotesize
 
 \begin{figure}
     \centering
     \includegraphics[width=1.025\textwidth]{figures/partition_fnct.png}
-    \caption{The lower the better, DGFS achieves the lowest bias in estimating the partition function across various benchmarks compared to PIS and DDS.}
+    \caption{The lower the better, DGFS achieves the lowest bias in estimating the partition function across various benchmarks except when compared to FAB w/ BUFFER.}
 \end{figure}
 
 \end{frame}
-
-% \begin{frame}[t]{Convergence Guarantees}
-% \footnotesize
-
-% \textbf{Convergence Guarantees for DGFS.}
-% \begin{itemize}\itemsep2pt
-%   \item Previous studies \cite{bortoli2022,chen2022,lee2022} show that the terminal sample distribution of a diffusion model converges to the target under mild assumptions if the control term is well learned. These apply to DGFS since proofs are independent of training method.
-%   \item \cite{zhang2022a} prove that a perfectly learned score corresponds to zero GFlowNet training loss \cite{bengio2021,bengio2023}, ensuring a well-trained DGFS accurately samples from the target distribution.
-% \end{itemize}
-
-% \note{Le but de montrer cette slide de garanties de convergences est pour prouver que malgrer les examples simples MoG, Manywell, etc (doivent etre simple pour avoir acces a la partition function Z, on peut garantir que DGFS va converger vers la bonne distribution cible pour des targets plus complexes.)}
-
-% \end{frame}
 
 \begin{frame}[t]{Mode coverage results}
 
@@ -639,6 +621,9 @@ The log-sum-exp trick is used as a smooth approximation to the maximum, providin
     
 \end{frame}
 
+%------------------------------------------------
+\section{Conclusion}
+
 \subsection{Strengths and Weaknesses}
 
 \begin{frame}{Strengths of DGFS}
@@ -646,51 +631,23 @@ The log-sum-exp trick is used as a smooth approximation to the maximum, providin
 
 \begin{block}{Strengths}
 \begin{itemize}\itemsep2pt
-  \item Works from unnormalized targets. Trains directly with \(\mu(x)\) (and optionally \(\nabla \log \mu\)), no dataset or partition function \(Z\) needed.
-  \item Well-calibrated endpoints. At convergence the terminal marginal \(p_N(x)\) matches \(\pi(x) \propto \mu(x)\); samples come with the right probabilities.
-  \item Intermediate learning signals. Subtrajectory Balance (SubTB) provides supervision on partial paths \(x_{m:n}\), solving the “terminal-only signal” issue of path-KL samplers (better temporal credit assignment, lower variance).
-  \item Fixed, closed-form backward. By terminal tilting, the target’s backward kernel equals the reference bridge (Gaussian, analytic), giving stable, non-circular constraints.
+    \item \textbf{Many intermediate signals} lead to better credit assignment, thus improving convergence speed, training stability, and reducing gradient variance.
+    \item \textbf{Better credit assignment} also led to better mode discovery and thus helped reducing the lower bound on many of the benchmarks compared to other path space samplers (PIS \cite{zhang2021path} and DDS \cite{vargas2023denoising}).
+    \item Proposed a new dynamic between \textbf{Stochastic Optimal Control}, \textbf{Sampling from an unnormalized density}, and \textbf{GFlowNet}.
+    \item Kept \textbf{convergence guarantees} from PIS seminar work.
 \end{itemize}
 \end{block}
 
 \end{frame}
-
 
 \begin{frame}{Weaknesses of DGFS}
 \footnotesize
 
-
 \begin{errorblock}{Weaknesses / Limitations}
 \begin{itemize}\itemsep1pt
-  \item Reliance on Gaussian reference. Closed-form backward requires (near-)Gaussian reference with constant covariance; non-Gaussian or state-dependent noise breaks the neat math.
-  \item Two nets to train. Must learn both the forward drift and the flow \(F_n\); more parameters, more tuning (time embeddings, loss weights).
-  \item \(\mu\)-query cost. Frequent evaluations of \(\mu(x)\) (and possibly \(\nabla \log \mu\)) can be expensive; SubTB helps, but large-scale tasks need caching/replay/prioritization.
-  \item Coverage still hard in high-D. Even with SubTB, exploring multi-modal, high-barrier landscapes can stall without tempering, momentum, or preconditioning.
-  \item State-space must match target. DGFS assumes a fixed continuous state space \(\mathbb{R}^D\); discrete/structured spaces need bespoke references/backwards or relaxations.
-  \item Hyperparameter sensitivity. Noise scale \(\bar{\sigma}\), step size \(h\), SubTB length-mixing \(\lambda\), and trajectory-sampling strategy materially affect stability/convergence.
-\end{itemize}
-\end{errorblock}
-
-\end{frame}
-
-%------------------------------------------------
-\section{Conclusion}
-
-\subsection{Opinionated Thoughts and Future Work}
-\begin{frame}{Personal Opinion on this work}
-\footnotesize
-
-\begin{block}{Summary of Contributions}
-\begin{itemize}\itemsep2pt
-  \item Addresses a key issue in path-space samplers: PIS and DDS needed full trajectory signals for learning.
-  \item Introduces subtrajectory signals from GFlowNet to reduce the credit assignment problem.
-\end{itemize}
-\end{block}
-
-\begin{errorblock}{Future Challenges}
-\begin{itemize}\itemsep2pt
-  \item For real-world applications (chemistry and physics) with unnormalized densities, better mode coverage is essential due to high dimensionality.
-  \item Current benchmarks show progress, but more work is needed on mode discovery and sample efficiency.
+    \item \textbf{Hyperparameter sensitivity}: A great part of the Appendix was dedicated to ablation studies, thus showing that the hyperparameters do vary a lot depending on the experiments.
+    \item \textbf{New framework introduces a second neural network}, which increases the training difficulty of this algorithm.
+    \item Even if it showed the best results among the path samplers in the benchmark, it was still magnitudes behind the FAB algorithm and \textbf{showed a lot of difficulties in the intermediate to hard level experiments}, thus increasing my doubts regarding the usage of this algorithm in a true complex highly dimensional setting for real world applications.
 \end{itemize}
 \end{errorblock}
 
@@ -699,17 +656,12 @@ The log-sum-exp trick is used as a smooth approximation to the maximum, providin
 \begin{frame}{Future Work}
 \footnotesize
 
-\textbf{Rare Event Sampling.} Extend DGFS to efficiently sample from rare event distributions, where the target density is concentrated in low-probability regions of the reference process. 
 
-\medskip
-
-\textbf{Movement from Path Space to Latent Space.} Many diffusion models operate in latent spaces for high-dimensional data (e.g., images). Adapting DGFS to learn flows in latent spaces could improve scalability and efficiency. It means they don't have to start with $\R^d$ as state space but could work in any latent space.
-
-\medskip
-
-\textbf{Introduce trick from RL.} Incorporate techniques from reinforcement learning, such as experience replay with buffer, off-policy training to improve exploration and sample efficiency in DGFS.
-
-\textcolor{red}{could add something with the partition function estimation Z}
+\begin{itemize}\itemsep2pt
+  \item \textbf{Rare event sampler:} By changing the framework, we would be able to emphasize rare event samples given an unnormalized distribution. By showing good mode discovery, we could train this sampler to retrieve many low-likelihood situations in order to prepare critical systems or safety systems in order to prepare them for all possibilities, not only the most likely.
+  \item \textbf{Latent space path:} We have seen many diffusion models papers taking the approach of diffusing on a latent space instead of the sample space (Stable Diffusion and DALL-E). Would this technique be as effective in a latent path space as it is in a latent sample space?
+  \item \textbf{Introducing more tricks from RL:} We could see that one of the really good performing samplers was FAB w/ BUFFER and they even talked slightly about off-policy in DGFS. It would be very interesting to implement replay buffer, off-policy exploration strategies, and other tricks which RL relies on to improve its performances.
+\end{itemize}
 
 \end{frame}
 
@@ -717,7 +669,7 @@ The log-sum-exp trick is used as a smooth approximation to the maximum, providin
 
 \begin{frame}{Questions and hopefully answers :)}
     \centering
-    \Huge Questions?
+    \Huge Questions!
 \end{frame}
 
 \begin{frame}[allowframebreaks]{References}

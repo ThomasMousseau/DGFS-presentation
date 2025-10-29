@@ -1,7 +1,7 @@
 \frametitle{}
 \footnotesize
 
-\vspace{-0.2cm}
+\vspace{-0.35cm}
 
 \begin{algorithm}[H]
     \footnotesize
@@ -13,12 +13,12 @@
 \Repeat
     \State Sample trajectories:
     \For{$b=1$ to $B$}
-        \State $\tau^{(b)}=(x^{(b)}_0,\ldots,x^{(b)}_N)$ under $x_{n+1}=x_n+h f_{\theta_f}(x_n,n)+\sqrt{h}\bar{\sigma}\varepsilon_n$, $\varepsilon_n\sim\mathcal N(0,I)$
+        \State $\tau^{(b)}=(x^{(b)}_0,\ldots,x^{(b)}_N)$ under $x_{n+1}=x_n+h f_{\theta}(x_n,n)+\sqrt{h}\bar{\sigma}\varepsilon_n$, $\varepsilon_n\sim\mathcal N(0,I)$
     \EndFor
     \State Build subtrajectories: $\mathcal S(\tau^{(b)})$ of $(m,n)$ with $0\le m<n\le N$
     \State Compute SubTB loss:
     \begin{equation*}
-    \mathcal L(\tau^{(b)};\theta)=\sum_{(m,n)\in\mathcal S(\tau^{(b)})}\lambda^{n-m}\left[\log\frac{F_\phi(x_m)\prod_{l=m}^{n-1} P_F(x_{l+1}\mid x_l;\theta_f)}{F_\phi(x_n)\prod_{l=m}^{n-1} P_B^{\mathrm{ref}}(x_l\mid x_{l+1})}\right]^2
+\mathcal L(\tau^{(b)};\theta)=\frac{\sum_{(m,n)\in\mathcal S(\tau^{(b)})}\lambda^{n-m}\left[\log\frac{F_\phi(x_m)\prod_{l=m}^{n-1} P_F(x_{l+1}\mid x_l;\theta_f)}{F_\phi(x_n)\prod_{l=m}^{n-1} P_B^{\mathrm{ref}}(x_l\mid x_{l+1})}\right]^2}{\sum_{(m,n)\in\mathcal S(\tau^{(b)})}\lambda^{n-m}}
     \end{equation*}
     \State $g \leftarrow \nabla_{\theta}\frac{1}{B}\sum_{b=1}^B \mathcal L(\tau^{(b)};\theta)$
     \State $\theta \leftarrow \mathrm{Adam}(\theta, g, \eta)$
