@@ -113,7 +113,7 @@ $D$ can be given under the form of:
 
 \begin{frame}[t]{Sampling from Unnormalized Densities}
 \footnotesize
-\textbf{Context.} Sample from a $D$-dimensional target with unnormalized density $\mu(x)$ where $\mathbb R^D \to \mathbb R^+$.
+\textbf{Context.} Sample from a $D$-dimensional target with unnormalized density $\mu(x)$ where $\mathbb R^D \to \mathbb R$.
 \[
 \pi(x)=\frac{\mu(x)}{Z},\qquad Z=\int_{\mathbb R^D}\mu(x)\,dx\ \text{(unknown)}.
 \]
@@ -126,30 +126,26 @@ We assume we can evaluate $\mu(x)$, but we have no samples from $\pi$ and do not
 
 \vspace{0.3cm}
 
-\begin{block}{\scriptsize Chemistry (molecule conformers).} \scriptsize Different 3D conformations have a formation energy from force-field terms (bonds, angles, dihedrals, nonbonded). A low energy means a higher probability of being sampled. A well-calibrated sampler is needed to draw conformers in proportion to these probabilities, which is important in binding-pose ranking, free-energy estimation and generating diverse realistic 3D conformers for screening.
+\begin{block}{\scriptsize Chemistry (molecule conformers).} \scriptsize 
+    Molecules admit many 3D conformations scored by an energy $E(x)$ (lower is better). We set $\mu(x)=\exp(-E(x))$ so larger $\mu$ means more desirable. Because many chemical properties are unknown or costly, a well-calibrated sampler draws conformers in proportion to $\mu$, yielding high-quality and diverse candidates for ranking, ensemble estimates, and realistic screening than chasing a single best pose.
+
 \end{block}
 
 \end{frame}
 
-
-% \begin{frame}[t]{Path Space Sampling}
-
-%     Minimizing the running and terminal costs between the optimal controlled process and the uncontrolled reference process.
-
-% \begin{figure}
-%     \centering
-%     \includegraphics[width=0.8\textwidth]{figures/image_v3.png}
-% \end{figure}
-
-% \note{refaire cette illustration avec le controlled, uncontrolled et target (optimal controlled) processus }
-
-% \end{frame}
 
 
 \subsection{Stochastic Optimal Control}
 \begin{frame}[t]{Controlled and Reference Processes}
 
 \scriptsize
+
+\vspace{-0.2cm}
+
+\begin{block}{\scriptsize Goal.} Learn $f_\theta$ so that the terminal marginal $Q(x_N)$ matches $\mu(x)$ and be proportional to $\pi(x)$ (no data, $Z$ unknown).
+\end{block}
+
+\medskip
 
 \begin{columns}[t]
 \begin{column}{0.48\textwidth}
@@ -168,7 +164,7 @@ p_n(x) = \int Q(x_{0:N})\,dx_{0:n-1}dx_{n+1:N}, \;\text{no closed form.}
 
 \end{column}
 \begin{column}{0.48\textwidth}
-\textbf{Uncontrolled/Reference forward transition (zero drift).}
+\textbf{Uncontrolled/Reference forward transition.}
 \[
 P_F^{\text{ref}}(x_{n+1}\mid x_n)\;=\;\mathcal N\!\big(x_{n+1};\;x_n,\;h\sigma^2 I\big)
 \]
@@ -182,9 +178,6 @@ p^{\text{ref}}_n(x) = \mathcal{N}\left( x; x_0, \Sigma_0 + n h \sigma^2 I \right
 \]
 \end{column}
 \end{columns}
-
-\begin{block}{\scriptsize Goal.} Learn $f_\theta$ so that the terminal marginal $Q(x_N)$ matches $\pi(x)=\mu(x)/Z$ (no data, $Z$ unknown.).
-\end{block}
 
 \note{Why closed form for uncontrolled but not controlled? The uncontrolled reference process has no drift, so each transition is a simple Gaussian convolution, leading to Gaussian marginals with closed-form means and variances $(e.g., p^{ref}_n(x) = N(x; mu_0, cov_0 + n h \sigma^2 I))$. The controlled process includes a learned drift $f(x_n, n)$, which makes transitions non-Gaussian and dependent on $f$, preventing a closed-form marginal expression without solving the integral numerically or via simulation.
 
@@ -201,12 +194,12 @@ p^{\text{ref}}_n(x) = \mathcal{N}\left( x; x_0, \Sigma_0 + n h \sigma^2 I \right
 x_N = x_0 + \sqrt{h} \sigma \sum_{k=0}^{N-1} \varepsilon \quad \varepsilon \sim \mathcal{N}(0, I) \quad \text{since we are using Brownian motion}.
 \]
 
-\textbf{Inverse of the Reparametrization Trick.}
+\textbf{Gaussian Form (Reparametrization Trick).}
 \[
-x_N \sim \mathcal{N}(x_0, \Sigma_0 + N h \sigma^2 I) \quad \text{where } \Sigma_0 \text{is the initial covariance.}
+x_N \sim \mathcal{N}(x_0, \Sigma_0 + N h \sigma^2 I) \quad \text{where } \Sigma_0 \text{ is the initial covariance.}
 \]
 
-\textbf{Probability Density Function of Terminal Sample.}
+\textbf{Probability Density Function of Terminal Marginal Distribution.}
 \[
 p^{\text{ref}}_N(x_N) = \frac{1}{(2\pi)^{D/2} |\Sigma_0 + N h \sigma^2 I|^{1/2}} \exp\left( -\frac{1}{2} (x_N - x_0)^\top (\Sigma_0 + N h \sigma^2 I)^{-1} (x_N - x_0) \right).
 \]
@@ -225,26 +218,19 @@ P(x_N) = \pi(x_N), \quad \text{but to reach } x_N, \text{ we will need a traject
 
 \medskip
 
-\textbf{The problem.} How to define a path space distribution $P(\tau)$ such that:
-
-% \[
-% P(x_N) = \text{process with a high weight on } \pi(x_N), \text{ knowing } \tau \text{ is sampled from the controlled process } Q
-% \]
 
 \[
 P(x_N) = \int_{\text{subtrajectories}} \underbrace{Q^{\text{ref}}(x_{0:N-1} | x_N) \, dx_{0:N-1} \cdot p_N^{\text{ref}}(x_N)}_{Q^{\text{ref}}(x_{0:N})} \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)} = \pi(x_N).
 \]
 
-% \text{but since we need to guide the controlled process, we need a signal over the entire trajectory and not only over the terminal distribution otherwise this would be extremely difficult to train (extreme credit assignment)}
 \medskip
 
-Let's sample from a single trajectory at a time:
+By adding a terminal tilt, the target process $P(\tau)$ biases every step of the trajectory towards regions where $\pi(x_N)$ is high:
 
 \[
-P(\tau) = Q^{\text{ref}}(\tau) \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)} \propto Q^{\text{ref}}(\tau) \cdot \frac{\mu(x_N)}{p_N^{\text{ref}}(x_N)}.
+P(\tau) = Q^{\text{ref}}(x_{0:N-1} | x_N) \cdot \pi(x_N) = Q^{\text{ref}}(\tau) \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)} \propto Q^{\text{ref}}(\tau) \cdot \frac{\mu(x_N)}{p_N^{\text{ref}}(x_N)}.
 \]
 
-% \text{Thus,  \cdot \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)}$; finally, since we only have access to $\mu(x_N)$, $P(\tau) \propto \frac{\pi(x_N)}{p_N^{\text{ref}}(x_N)}$ and this entire process as a signal to guide to something proportional to $\mu(x_N)$.}
 
 \end{frame}
 
@@ -259,7 +245,7 @@ P(x_{0:N})\propto\ Q^{\text{ref}}(x_{0:N})\,\frac{\mu(x_N)}{p^{\text{ref}}_N(x_N
 \qquad\Longrightarrow\qquad P(x_N)\propto\mu(x_N).
 \]
 
-\textbf{KL decomposition.}
+\textbf{KL decomposition using Girsanov theorem (path space).}
 \[
 \mathrm{KL}(Q\|P)
 =\mathbb E_{Q}\!\left[\log\frac{Q}{P}\right]
@@ -269,41 +255,21 @@ P(x_{0:N})\propto\ Q^{\text{ref}}(x_{0:N})\,\frac{\mu(x_N)}{p^{\text{ref}}_N(x_N
 
 
 \medskip
-\textbf{Running control cost (Gaussian mean-shift) Girsanov theorem.}
+\textbf{Running cost.}
 \[
 \mathbb E_{Q}\!\left[\log\frac{Q}{Q^{\text{ref}}}\right]
-=\mathbb E_Q \sum_{n=0}^{N-1}\frac{h}{2\sigma^2}\,\|f_\theta(x_n,n)\|^2.
+=\mathbb E_Q\!\big[\sum_{n=0}^{N-1}\frac{h}{2\sigma^2}\,\|f_\theta(x_n,n)\|^2\big].
 \]
 
 \textbf{Terminal cost.}
 \[
 \mathbb E_{Q}\!\left[\log\frac{p^{\text{ref}}_N(x_N)}{\mu(x_N)}\right]
-=\mathbb E_Q\!\big[\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\big]
+=\mathbb E_Q\!\big[\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)\big].
 \]
 
-\note{ \textcolor{red}{Je devrais avoir une slide complete a explier d'ou vient le foward target process $P$ parce que c'est le coeur de mon algorithme} }
 \end{frame}
 
-% \begin{frame}[t]{Target Path Measure via Importance Sampling}
-% \footnotesize
 
-% \textbf{Importance Sampling Basics.} Importance sampling is a technique to estimate expectations under a hard-to-sample target distribution \( P \) using samples from an easy-to-sample proposal distribution \( Q \). The key formula is:
-% \[
-% \mathbb{E}_{x \sim Q} \left[ f(x) \cdot w(x) \right] = \mathbb{E}_{x \sim P} [f(x)],
-% \]
-% where the \textcolor{red}{\emph{importance weight} \( w(x) = \frac{P(x)}{Q(x)} \)} corrects the samples from \( Q \) to behave as if they were from \( P \).
-
-% \textbf{Intuition.} \( Q \) provides "biased" samples; \( w(x) \) upweights samples that are likely under \( P \) and downweights those that aren't, effectively resampling from \( P \) without directly sampling it.
-
-% \textbf{Application to Path Measures.} In our case, the "samples" are entire trajectories \( x_{0:N} \), and we want the path measure \( P \) to have the correct terminal marginal \( \pi(x_N) \propto \mu(x_N) \). We use the reference path measure \( Q^{\text{ref}} \) (easy to sample, e.g., Gaussian paths) as the proposal. The reweighted path measure is:
-% \[
-% P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \cdot w(x_{0:N}),
-% \]
-% where the weight \( w(x_{0:N}) = \frac{\pi(x_N)}{p^{\text{ref}}_N(x_N)} \). This ensures \( P(x_N) \propto \mu(x_N) \), as the weight depends only on the endpoint.
-
-% \end{frame}
-
-%------------------------------------------------
 \section{Method}
 
 \subsection{Solving Credit Assignment Problem}
@@ -386,11 +352,18 @@ This objective is used on the seminar paper \emph{Path Integral Sampler: Diffusi
 \begin{frame}[t]{Adressing Credit Assignment via Target Process}
 \footnotesize
 
-\begin{errorblock}{Target process necessitates terminal reweighting...}
-    \[
-P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)} \implies P(x_N) \propto \mu(x_N).
+\begin{errorblock}{SOC Discrete-time objective}
+\[
+\min_{f_\theta}\ \mathbb E_Q\!\Big[{\sum_{n=0}^{N-1}\tfrac{h}{2\sigma^2}\|f_\theta(x_n,n)\|^2}\;+\;{\log p^{\text{ref}}_N(x_N)-\log \mu(x_N)}\Big]
 \]
+
 \end{errorblock}
+
+% \begin{errorblock}{Target process necessitates terminal reweighting...}
+%     \[
+% P(x_{0:N}) \propto Q^{\text{ref}}(x_{0:N}) \frac{\mu(x_N)}{p^{\text{ref}}_N(x_N)} \implies P(x_N) \propto \mu(x_N).
+% \]
+% \end{errorblock}
 
 \begin{block}{Could we write the target process differently to allow intermediate supervision?}
 
@@ -401,12 +374,6 @@ P(x_{0:N}) = \pi(x_N) \prod_{n=0}^{N-1} Q_B^{\text{ref}}(x_n | x_{n+1}),
 where $Q_B^{\text{ref}}(\cdot | \cdot)$ is the backward transition probability (derived from the target joint). This is tractable because $Q_B^{\text{ref}}$ is known.
 
 \end{block}
-
-
-
-
-
-\note{conditional form is exactly like the RHS of the trajectory balance equation in gfn. \textcolor{red}{Lire le paper de Nikolay sur Trajectory Balance pour bien comprendre cette equation et comment elle se relie a DGFS}}
 
 \end{frame}
 
@@ -484,12 +451,17 @@ p_n(x_n) \propto \int_{\mathbb{R}^{(N-n)D}} \mu(x_N) \prod_{k=n}^{N-1} Q^{\text{
 \begin{frame}[t]{Detailed and SubTB Balance with Learned Flow}
 \footnotesize
 
-\begin{errorblock}{Detailed Balance from Trajectory Balance condition.} Comparing the constraint for $n$ and $n+1$ gives a formula independent of $\mu$ which now only involves local transitions (signal subtrajectories instead of full trajectories)
+
+\vspace{0.5cm}
+
+\begin{errorblock}{Detailed Balance Condition with Learned Flow} 
 \[
-F_n(x_n; \theta) P_F(x_{n+1} | x_n; \theta) = F_{n+1}(x_{n+1}; \theta) P_B(x_n | x_{n+1}).
+F_n(x_n; \phi) P_F(x_{n+1} | x_n; \theta) = F_{n+1}(x_{n+1}; \phi) P_B(x_n | x_{n+1}).
 \]
 
 \end{errorblock}
+
+\medskip
 
 
 \begin{block}{Subtrajectory Balance Loss for Partial Trajectories}
@@ -509,7 +481,7 @@ Using a mix of different subtrajectory lengths $(m,n)$ allows better credit assi
 \begin{frame}[t]{Overall Training Objective}
 \scriptsize
 
-\vspace{-0.25cm}
+\vspace{0.1cm}
 
 \begin{block}{\scriptsize Recall SubTB Loss}
 \scriptsize
@@ -527,9 +499,8 @@ L(\tau; \theta; \phi) = \frac{\sum_{0 \leq m < n \leq N} \lambda^{n-m} \ell_{\te
 \textbf{This combines signals from all subtrajectory lengths, reducing variance and improving credit assignment}
 \begin{itemize}\itemsep2pt
   \item $\tau$: Full trajectory $(x_0, \dots, x_N)$.
-  \item $\lambda$: Positive scalar weighting different subtrajectory lengths (e.g., shorter subtrajectories get higher weight if $\lambda < 1$).
-  \item The numerator sums SubTB losses over all subtrajectories $x_{m:n}$, weighted by $\lambda^{n-m}$ (length-based weighting).
-  \item The denominator normalizes to average the losses..
+  \item $\lambda$: $(0, 1]$ to weight shorter subtrajectories more since they have lower variance.
+  \item The denominator normalizes to average the losses
 \end{itemize}
 
 \end{errorblock}
